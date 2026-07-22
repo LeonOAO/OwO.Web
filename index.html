@@ -1,1 +1,84 @@
-<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111827"><title>OwO Browser</title><link rel="icon" href="./assets/owo.svg" type="image/svg+xml"><link rel="stylesheet" href="./assets/browser.css"></head><body><div class="browser"><header><div class="tabs"><div class="brand"><img src="./assets/owo.svg" alt="OwO"><b>OwO Browser</b></div><div id="tabList"></div><button id="addTab">＋</button></div><div class="toolbar"><button id="back">←</button><button id="forward">→</button><button id="reload">↻</button><button id="home">⌂</button><form id="addressForm"><span>◇</span><input id="address" placeholder="搜尋或輸入網址" autocomplete="off"><button>前往</button></form><button id="star">☆</button><button id="settings">⋮</button></div><div id="progress"><i></i></div></header><main><section id="start"><img class="hero-logo" src="./assets/owo.svg" alt="OwO Logo"><h1>OwO Browser</h1><p>可愛、簡潔，像一般瀏覽器一樣使用分頁與網址列。</p><form id="startForm"><input id="startInput" placeholder="輸入網址，例如 example.com"><button>開啟</button></form><div class="shortcuts"><button data-url="https://www.wikipedia.org/"><b>W</b><small>Wikipedia</small></button><button data-url="https://www.google.com/"><b>G</b><small>Google</small></button><button data-url="https://github.com/"><b>GH</b><small>GitHub</small></button><button id="startSettings"><b>⚙</b><small>連線設定</small></button></div></section><section id="content" hidden><iframe id="frame" title="OwO Browser 內容"></iframe></section><section id="notice" hidden><div><img src="./assets/owo.svg" alt="OwO"><h2>OwO 引擎執行提示</h2><p id="noticeText"></p><button id="noticeHome">回到 OwO 首頁</button></div></section></main><footer><span id="status">OwO 已就緒</span><span id="connection">Scramjet · Wisp 尚未設定</span></footer></div><dialog id="settingsDialog"><form id="settingsForm" method="dialog"><header><div><small>OwO SETTINGS</small><h2>OwO 瀏覽器設定</h2></div><button value="cancel">×</button></header><fieldset><legend>處理引擎</legend><label><input type="radio" name="engine" value="scramjet"> Scramjet</label><label><input type="radio" name="engine" value="ultraviolet"> Ultraviolet</label></fieldset><label class="field">Wisp WebSocket 位址<input id="wisp" placeholder="wss://wisp.example.com/wisp/"></label><label class="check">啟動前連線檢測 <input id="preflight" type="checkbox"></label><div class="test"><i id="lamp"></i><span><b id="testTitle">尚未檢測</b><small id="testDetail">可先測試 OwO Wisp 連線。</small></span></div><footer><button id="testButton" type="button">測試連線</button><button value="save">儲存設定</button></footer></form></dialog><script src="./config.js"></script><script type="module" src="./js/browser.js"></script></body></html>
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>OwO Browser</title>
+  <link rel="icon" href="./Assets/owo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./Assets/browser.css">
+</head>
+<body>
+<div class="browser">
+  <header class="chrome">
+    <div class="tabbar">
+      <a class="brand" href="./" aria-label="OwO Browser 首頁"><img src="./Assets/owo.svg" alt=""><strong>OwO Browser</strong></a>
+      <div id="tabList" class="tab-list" role="tablist" aria-label="分頁"></div>
+      <button id="addTab" class="icon-button add-tab" type="button" title="新增分頁" aria-label="新增分頁">＋</button>
+    </div>
+    <div class="toolbar">
+      <div class="nav-buttons">
+        <button id="back" class="icon-button" type="button" title="上一頁">←</button>
+        <button id="forward" class="icon-button" type="button" title="下一頁">→</button>
+        <button id="reload" class="icon-button" type="button" title="重新整理">↻</button>
+        <button id="home" class="icon-button" type="button" title="首頁">⌂</button>
+      </div>
+      <form id="addressForm" class="address-form" novalidate>
+        <span class="site-icon">◇</span>
+        <input id="address" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="搜尋或輸入網址">
+        <button class="go-button" type="submit">前往</button>
+      </form>
+      <div class="tool-buttons">
+        <button id="star" class="icon-button" type="button" title="書籤">☆</button>
+        <button id="settings" class="icon-button" type="button" title="設定">⋮</button>
+      </div>
+    </div>
+    <div id="progress" class="progress"><i></i></div>
+  </header>
+
+  <main class="workspace">
+    <section id="start" class="start-page">
+      <div class="start-card">
+        <img class="hero-logo" src="./Assets/owo.svg" alt="OwO Logo">
+        <h1>OwO Browser</h1>
+        <p>可愛、簡潔，像一般瀏覽器一樣使用分頁與網址列。</p>
+        <form id="startForm" class="start-form" novalidate>
+          <input id="startInput" type="text" inputmode="url" autocomplete="off" placeholder="輸入網址，例如 example.com">
+          <button type="submit">開啟</button>
+        </form>
+        <div class="shortcuts">
+          <button type="button" data-url="https://www.wikipedia.org/"><b>W</b><small>Wikipedia</small></button>
+          <button type="button" data-url="https://www.google.com/"><b>G</b><small>Google</small></button>
+          <button type="button" data-url="https://github.com/"><b>GH</b><small>GitHub</small></button>
+          <button id="startSettings" type="button"><b>⚙</b><small>連線設定</small></button>
+        </div>
+      </div>
+    </section>
+    <section id="content" class="content-page" hidden><iframe id="frame" title="OwO Browser 內容" referrerpolicy="no-referrer" allow="fullscreen;clipboard-read;clipboard-write;autoplay;encrypted-media"></iframe></section>
+    <section id="notice" class="notice-page" hidden><div class="notice-card"><img src="./Assets/owo.svg" alt=""><h2>引擎執行提示</h2><p id="noticeText"></p><button id="noticeHome" type="button">回到首頁</button></div></section>
+  </main>
+  <footer class="statusbar"><span id="status">已就緒</span><span id="connection">Scramjet · Wisp 尚未設定</span></footer>
+</div>
+
+<dialog id="settingsDialog" class="settings-dialog">
+  <form id="settingsForm" class="settings-card" novalidate>
+    <header class="dialog-header">
+      <div><small>SETTINGS</small><h2>瀏覽器設定</h2></div>
+      <button id="closeSettings" class="dialog-close" type="button" aria-label="關閉設定">×</button>
+    </header>
+    <fieldset>
+      <legend>處理引擎</legend>
+      <div class="engine-options">
+        <label><input type="radio" name="engine" value="scramjet"><span><b>Scramjet</b><small>攔截與重寫引擎</small></span></label>
+        <label><input type="radio" name="engine" value="ultraviolet"><span><b>Ultraviolet</b><small>Service Worker 重寫引擎</small></span></label>
+      </div>
+    </fieldset>
+    <label class="field"><span>Wisp WebSocket 位址</span><input id="wisp" type="text" inputmode="url" placeholder="wss://wisp.example.com/wisp/"></label>
+    <label class="check-row"><span><b>啟動前連線檢測</b><small>開啟網址前先測試 WebSocket 握手</small></span><input id="preflight" type="checkbox"></label>
+    <div class="test-result"><i id="lamp"></i><span><b id="testTitle">尚未檢測</b><small id="testDetail">可先測試 Wisp 連線。</small></span></div>
+    <footer class="dialog-actions"><button id="testButton" type="button" class="secondary">測試連線</button><button id="saveSettings" type="submit" class="primary">儲存設定</button></footer>
+  </form>
+</dialog>
+<script src="./config.js"></script>
+<script type="module" src="./JS/browser.js"></script>
+</body></html>
