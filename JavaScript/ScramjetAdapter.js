@@ -88,6 +88,7 @@ async function ensureScramjetController() {
 
     const { ScramjetController } = loader();
     controller = new ScramjetController({
+        prefix: `${ROOT_URL.pathname}scramjet/`,
         files: {
             wasm: FILES.scramjetWasm,
             all: FILES.scramjetAll,
