@@ -1,4 +1,4 @@
-﻿const KEY = "owo.browser.settings.v2.2";
+const KEY = "owo.browser.settings.v2.2";
 const cfg = window.OWO_CONFIG || {};
 let settings = loadSettings();
 let tabs = [];
@@ -296,7 +296,26 @@ $("#home").addEventListener("click", () => {
 $("#noticeHome").addEventListener("click", () => $("#home").click());
 $("#back").addEventListener("click", () => moveHistory(-1));
 $("#forward").addEventListener("click", () => moveHistory(1));
-$("#reload").addEventListener("click", () => void openCurrentTab());
+$("#reload").addEventListener("click", async () => {
+    const tab = activeTab();
+    if (!tab?.url) {
+        showHome();
+        return;
+    }
+
+    el.status.textContent = "正在重新連線";
+    el.progress.classList.add("loading");
+
+    try {
+        el.frame.src = "about:blank";
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await openCurrentTab();
+    } catch (error) {
+        showNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+        el.progress.classList.remove("loading");
+    }
+});
 $("#settings").addEventListener("click", openSettings);
 $("#startSettings").addEventListener("click", openSettings);
 $("#star").addEventListener("click", () => {
