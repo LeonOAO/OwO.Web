@@ -90,9 +90,11 @@ async function ensureScramjetController() {
     controller = new ScramjetController({
         prefix: `${ROOT_URL.pathname}scramjet/`,
         files: {
-            wasm: FILES.scramjetWasm,
-            all: FILES.scramjetAll,
-            sync: FILES.scramjetSync,
+            // Scramjet v1 stores these values in IndexedDB and compares them
+            // as same-origin pathnames inside its Service Worker.
+            wasm: new URL(FILES.scramjetWasm).pathname,
+            all: new URL(FILES.scramjetAll).pathname,
+            sync: new URL(FILES.scramjetSync).pathname,
         },
     });
 
