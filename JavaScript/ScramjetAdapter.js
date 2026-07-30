@@ -125,6 +125,10 @@ async function initializeRuntime(wispValue) {
     if (!initialization) {
         initialization = (async () => {
             ensureSecureContext();
+
+            // Bare-Mux must be ready before Scramjet's Service Worker starts.
+            // Otherwise the worker repeatedly waits for a SharedWorker MessagePort.
+            await ensureTransport(wisp);
             await ensureScramjetController();
             await ensureServiceWorker();
         })().catch((error) => {
@@ -134,6 +138,8 @@ async function initializeRuntime(wispValue) {
     }
 
     await initialization;
+
+    // Reapply the transport only when the user changes the Wisp URL.
     await ensureTransport(wisp);
     return controller;
 }
