@@ -1,4 +1,4 @@
-﻿import { BareMuxConnection } from "../BareMux/index.mjs";
+import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
 const FILES = Object.freeze({
@@ -14,6 +14,7 @@ let controller = null;
 let connection = null;
 let initializedWisp = "";
 let initialization = null;
+let runtimeScriptPromise = null;
 
 function ensureSecureContext() {
     if (!window.isSecureContext && location.hostname !== "localhost") {
@@ -38,13 +39,54 @@ function validateWisp(value) {
     return url.href;
 }
 
+function loadRuntimeScript() {
+    if (typeof window.$scramjetLoadController === "function") {
+        return Promise.resolve();
+    }
+    if (runtimeScriptPromise) return runtimeScriptPromise;
+
+    runtimeScriptPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-owo-scramjet-runtime="true"]');
+        const script = existing || document.createElement("script");
+
+        const finish = () => {
+            if (typeof window.$scramjetLoadController === "function") {
+                resolve();
+            } else {
+                runtimeScriptPromise = null;
+                reject(new Error("Scramjet Runtime 已下載，但控制器介面未建立。請清除網站快取後重試。"));
+            }
+        };
+
+        const fail = () => {
+            runtimeScriptPromise = null;
+            reject(new Error(`Scramjet Runtime 載入失敗：${FILES.scramjetAll}`));
+        };
+
+        script.addEventListener("load", finish, { once: true });
+        script.addEventListener("error", fail, { once: true });
+
+        if (!existing) {
+            script.src = FILES.scramjetAll;
+            script.async = true;
+            script.dataset.owoScramjetRuntime = "true";
+            document.head.appendChild(script);
+        }
+    });
+
+    return runtimeScriptPromise;
+}
+
 async function ensureScramjetController() {
     if (controller) return controller;
-    if (typeof window.$scramjetLoadController !== "function") {
-        throw new Error("Scramjet Runtime 未載入，請確認 Scramjet/scramjet.all.js 存在。");
+
+    await loadRuntimeScript();
+    const loader = window.$scramjetLoadController;
+    if (typeof loader !== "function") {
+        throw new Error("Scramjet Runtime 控制器載入失敗。");
     }
 
-    const { ScramjetController } = window.$scramjetLoadController();
+    const { ScramjetController } = loader();
     controller = new ScramjetController({
         files: {
             wasm: FILES.scramjetWasm,
@@ -78,6 +120,7 @@ async function ensureTransport(wisp) {
 
 async function initializeRuntime(wispValue) {
     const wisp = validateWisp(wispValue);
+
     if (!initialization) {
         initialization = (async () => {
             ensureSecureContext();
@@ -88,6 +131,7 @@ async function initializeRuntime(wispValue) {
             throw error;
         });
     }
+
     await initialization;
     await ensureTransport(wisp);
     return controller;
