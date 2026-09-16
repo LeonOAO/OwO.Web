@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.5.2";
+const VERSION = "2.5.3";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
@@ -309,10 +309,13 @@ function installLoginSubmitFallback(frameElement) {
                 pagePair.pageSessionHash ? Promise.resolve(pagePair.pageSessionHash) : shortHash(pagePair.pageSessionValue),
                 pagePair.pageCsrfHash ? Promise.resolve(pagePair.pageCsrfHash) : shortHash(pagePair.pageCsrfValue),
             ]).then(([currentSessionHash, submitCsrfHash, pageSessionHash, pageCsrfHash]) => {
-                const sessionMatchesPage = currentSessionHash === pageSessionHash;
+                const sessionObservable = Boolean(pagePair.pageSessionValue || currentSessionValue);
+                const sessionMatchesPage = sessionObservable ? currentSessionHash === pageSessionHash : null;
                 const csrfMatchesPage = submitCsrfHash === pageCsrfHash;
                 let diagnosis = "page-submit-pair-consistent";
-                if (!sessionMatchesPage && !csrfMatchesPage) diagnosis = "session-and-csrf-both-changed";
+                if (!sessionObservable && csrfMatchesPage) diagnosis = "csrf-consistent-session-unobservable";
+                else if (!sessionObservable && !csrfMatchesPage) diagnosis = "csrf-changed-session-unobservable";
+                else if (!sessionMatchesPage && !csrfMatchesPage) diagnosis = "session-and-csrf-both-changed";
                 else if (!sessionMatchesPage) diagnosis = "session-changed-after-page-load";
                 else if (!csrfMatchesPage) diagnosis = "csrf-changed-after-page-load";
 
@@ -322,6 +325,7 @@ function installLoginSubmitFallback(frameElement) {
                     pageCsrfHash,
                     submitCsrfHash,
                     sessionMatchesPage,
+                    sessionObservable,
                     csrfMatchesPage,
                     sessionVisibleToDocument: Boolean(currentSessionValue),
                     elapsedMs: Date.now() - pagePair.capturedAt,
@@ -329,6 +333,7 @@ function installLoginSubmitFallback(frameElement) {
                 console.info("[OwO Login Pair 3/3 DIAGNOSIS]", {
                     diagnosis,
                     sessionMatchesPage,
+                    sessionObservable,
                     csrfMatchesPage,
                     note: currentSessionValue ? "document-cookie-session-observed" : "http-only-session-not-visible-in-frame",
                 });
@@ -360,7 +365,7 @@ function installLoginSubmitFallback(frameElement) {
             scheduleFallback("登入按鈕未觸發 Submit");
         }, true);
 
-        console.info("[OwO] 已啟用登入 Session／CSRF 全鏈診斷 v2.5.2。");
+        console.info("[OwO] 已啟用登入 GET／POST HttpOnly Session 配對診斷 v2.5.3。");
         return true;
     };
 
