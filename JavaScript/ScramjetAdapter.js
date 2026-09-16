@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.3.1";
+const VERSION = "2.3.2";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
