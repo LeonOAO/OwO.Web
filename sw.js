@@ -1,5 +1,7 @@
 "use strict";
 
+// OwO Web 2.2.1: persist proxied HTTP Set-Cookie sessions across reloads.
+
 importScripts("./Scramjet/scramjet.all.js");
 
 const { ScramjetServiceWorker } = self.$scramjetLoadWorker();
