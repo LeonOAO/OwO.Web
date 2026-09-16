@@ -1,6 +1,6 @@
 "use strict";
 
-// OwO Web 2.2.2: persist proxied HTTP Set-Cookie sessions across reloads.
+// OwO Web 2.3.0: robust Scramjet frame navigation and login-session persistence.
 
 importScripts("./Scramjet/scramjet.all.js");
 
