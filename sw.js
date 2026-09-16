@@ -7,6 +7,13 @@ importScripts("./Scramjet/scramjet.all.js?v=2.2.1");
 const { ScramjetServiceWorker } = self.$scramjetLoadWorker();
 const scramjet = new ScramjetServiceWorker();
 
+globalThis.__owoLoginDiagnosticLogEnabled = false;
+self.addEventListener("message", (event) => {
+    if (event?.data?.type !== "OWOB_LOGIN_DIAGNOSTIC_LOG") return;
+    globalThis.__owoLoginDiagnosticLogEnabled =
+        String(event.data.value || "").trim().toUpperCase() === "ON";
+});
+
 self.addEventListener("install", () => {
     self.skipWaiting();
 });
