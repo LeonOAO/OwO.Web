@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.3.0";
+const VERSION = "2.3.1";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
@@ -107,6 +107,8 @@ async function ensureTransport(wisp) {
     if (!connection) connection = new BareMuxConnection(FILES.bareMuxWorker);
     if (initializedWisp !== wisp) {
         await connection.setTransport(FILES.libcurlTransport, [{ websocket: wisp }]);
+        const transportName = await connection.getTransport();
+        if (!transportName) throw new Error("BareMux Transport 初始化失敗。");
         initializedWisp = wisp;
     }
 }
