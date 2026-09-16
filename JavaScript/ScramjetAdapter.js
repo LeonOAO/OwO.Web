@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.4.6";
+const VERSION = "2.4.7";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
@@ -236,17 +236,29 @@ function installLoginSubmitFallback(frameElement) {
 
         form.addEventListener("submit", () => {
             if (form.dataset.owoSubmitting === "true") return;
-            scheduleFallback("網站 Submit 未產生導覽");
+
+            // 一旦原始 submit 事件已發生，就視為網站提交流程已啟動。
+            // 立即取消 Click 保底，避免同一份帳密與 CSRF Token 被重送第二次。
+            form.dataset.owoSubmitting = "true";
+            frameWindow.clearTimeout(fallbackTimer);
+
+            const button = form.querySelector('button[type="submit"], input[type="submit"]');
+            if (button) button.disabled = true;
+
+            console.info("[OwO] 已偵測網站原始 Submit，取消原生 POST 保底以確保單次提交。");
         }, true);
 
         form.addEventListener("click", (event) => {
             const button = event.target?.closest?.('button[type="submit"], input[type="submit"]');
             if (!button || button.form !== form) return;
             if (form.dataset.owoSubmitting === "true") return;
-            scheduleFallback("登入按鈕未產生導覽");
+
+            // Click 保底只處理完全沒有觸發 submit 事件的異常頁面。
+            // 正常表單會在同一輪事件中觸發 submit，屆時會立即清除此計時器。
+            scheduleFallback("登入按鈕未觸發 Submit");
         }, true);
 
-        console.info("[OwO] 已啟用登入提交保底 v2.4.6。");
+        console.info("[OwO] 已啟用登入單次提交保底 v2.4.7。");
         return true;
     };
 
