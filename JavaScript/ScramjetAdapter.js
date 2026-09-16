@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.5.0";
+const VERSION = "2.5.1";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
@@ -258,7 +258,7 @@ function installLoginSubmitFallback(frameElement) {
             scheduleFallback("登入按鈕未觸發 Submit");
         }, true);
 
-        console.info("[OwO] 已啟用登入完整鏈診斷 v2.5.0。");
+        console.info("[OwO] 已啟用登入強制 Session 鏈一致性 v2.5.1。");
         return true;
     };
 
