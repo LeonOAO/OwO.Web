@@ -1,6 +1,6 @@
 "use strict";
 
-// OwO Web 2.4.3: robust Scramjet frame navigation and login-session persistence.
+// OwO Web 2.4.4: robust Scramjet frame navigation and login-session persistence.
 
 importScripts("./Scramjet/scramjet.all.js");
 
