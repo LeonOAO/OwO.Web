@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.5.1";
+const VERSION = "2.5.2";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
@@ -207,6 +207,70 @@ function installLoginSubmitFallback(frameElement) {
 
         let fallbackTimer = 0;
 
+        const shortHash = async (value) => {
+            try {
+                if (!value) return "missing";
+                const bytes = new TextEncoder().encode(String(value));
+                const digest = await frameWindow.crypto.subtle.digest("SHA-256", bytes);
+                return Array.from(new Uint8Array(digest))
+                    .map((byte) => byte.toString(16).padStart(2, "0"))
+                    .join("")
+                    .slice(0, 12);
+            } catch {
+                return "hash-error";
+            }
+        };
+
+        const readSessionValue = () => {
+            try {
+                const cookieText = String(frameWindow.document.cookie || "");
+                const match = cookieText.match(/(?:^|;\s*)_cyberbiz_session=([^;]*)/i);
+                return match ? match[1] : "";
+            } catch {
+                return "";
+            }
+        };
+
+        const readCsrfValue = () => {
+            try {
+                return String(form.querySelector('input[name="authenticity_token"]')?.value || "");
+            } catch {
+                return "";
+            }
+        };
+
+        const pagePair = {
+            pageSessionValue: readSessionValue(),
+            pageCsrfValue: readCsrfValue(),
+            pageUrl: String(frameWindow.location?.href || ""),
+            capturedAt: Date.now(),
+        };
+
+        Promise.all([
+            shortHash(pagePair.pageSessionValue),
+            shortHash(pagePair.pageCsrfValue),
+        ]).then(([pageSessionHash, pageCsrfHash]) => {
+            pagePair.pageSessionHash = pageSessionHash;
+            pagePair.pageCsrfHash = pageCsrfHash;
+            console.info("[OwO Login Pair 1/3 PAGE]", {
+                pageSessionHash,
+                pageCsrfHash,
+                sessionVisibleToDocument: Boolean(pagePair.pageSessionValue),
+                csrfPresent: Boolean(pagePair.pageCsrfValue),
+                csrfCount: form.querySelectorAll('input[name="authenticity_token"]').length,
+                loginFormPresent: true,
+                formActionPath: (() => {
+                    try { return new URL(form.action, frameWindow.location.href).pathname; }
+                    catch { return "unparseable"; }
+                })(),
+            });
+        }).catch((error) => {
+            console.warn("[OwO Login Pair Diagnostic Error]", {
+                stage: "PAGE",
+                message: error?.message || "unknown",
+            });
+        });
+
         const lockAndSubmit = () => {
             if (form.dataset.owoSubmitting === "true") return;
             if (!form.checkValidity()) {
@@ -237,6 +301,44 @@ function installLoginSubmitFallback(frameElement) {
         form.addEventListener("submit", () => {
             if (form.dataset.owoSubmitting === "true") return;
 
+            const currentSessionValue = readSessionValue();
+            const submitCsrfValue = readCsrfValue();
+            Promise.all([
+                shortHash(currentSessionValue),
+                shortHash(submitCsrfValue),
+                pagePair.pageSessionHash ? Promise.resolve(pagePair.pageSessionHash) : shortHash(pagePair.pageSessionValue),
+                pagePair.pageCsrfHash ? Promise.resolve(pagePair.pageCsrfHash) : shortHash(pagePair.pageCsrfValue),
+            ]).then(([currentSessionHash, submitCsrfHash, pageSessionHash, pageCsrfHash]) => {
+                const sessionMatchesPage = currentSessionHash === pageSessionHash;
+                const csrfMatchesPage = submitCsrfHash === pageCsrfHash;
+                let diagnosis = "page-submit-pair-consistent";
+                if (!sessionMatchesPage && !csrfMatchesPage) diagnosis = "session-and-csrf-both-changed";
+                else if (!sessionMatchesPage) diagnosis = "session-changed-after-page-load";
+                else if (!csrfMatchesPage) diagnosis = "csrf-changed-after-page-load";
+
+                console.info("[OwO Login Pair 2/3 SUBMIT]", {
+                    pageSessionHash,
+                    currentSessionHash,
+                    pageCsrfHash,
+                    submitCsrfHash,
+                    sessionMatchesPage,
+                    csrfMatchesPage,
+                    sessionVisibleToDocument: Boolean(currentSessionValue),
+                    elapsedMs: Date.now() - pagePair.capturedAt,
+                });
+                console.info("[OwO Login Pair 3/3 DIAGNOSIS]", {
+                    diagnosis,
+                    sessionMatchesPage,
+                    csrfMatchesPage,
+                    note: currentSessionValue ? "document-cookie-session-observed" : "http-only-session-not-visible-in-frame",
+                });
+            }).catch((error) => {
+                console.warn("[OwO Login Pair Diagnostic Error]", {
+                    stage: "SUBMIT",
+                    message: error?.message || "unknown",
+                });
+            });
+
             // 一旦原始 submit 事件已發生，就視為網站提交流程已啟動。
             // 立即取消 Click 保底，避免同一份帳密與 CSRF Token 被重送第二次。
             form.dataset.owoSubmitting = "true";
@@ -258,7 +360,7 @@ function installLoginSubmitFallback(frameElement) {
             scheduleFallback("登入按鈕未觸發 Submit");
         }, true);
 
-        console.info("[OwO] 已啟用登入強制 Session 鏈一致性 v2.5.1。");
+        console.info("[OwO] 已啟用登入 Session／CSRF 全鏈診斷 v2.5.2。");
         return true;
     };
 
