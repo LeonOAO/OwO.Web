@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.4.1";
+const VERSION = "2.4.2";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
@@ -188,63 +188,86 @@ async function initializeRuntime(wispValue) {
 function installLoginSubmitFallback(frameElement) {
     const frameWindow = frameElement?.contentWindow;
     const frameDocument = frameElement?.contentDocument;
-    if (!frameWindow || !frameDocument || frameDocument.__owoLoginFallbackInstalled) return;
+    if (!frameWindow || !frameDocument) return false;
+    if (frameDocument.__owoLoginFallbackInstalled) return true;
 
-    const locationHref = String(frameWindow.location?.href || "");
-    if (!locationHref.includes("shop.funbox.com.tw/account/login")) return;
+    const findLoginForm = () => frameDocument.querySelector(
+        'form#customer_login[method="post"], form#customer_login[method="POST"]'
+    );
 
-    Object.defineProperty(frameDocument, "__owoLoginFallbackInstalled", {
-        value: true,
-        configurable: true,
+    const attachToLoginForm = () => {
+        const form = findLoginForm();
+        if (!form) return false;
+        if (frameDocument.__owoLoginFallbackInstalled) return true;
+
+        Object.defineProperty(frameDocument, "__owoLoginFallbackInstalled", {
+            value: true,
+            configurable: true,
+        });
+
+        let fallbackTimer = 0;
+
+        const lockAndSubmit = () => {
+            if (form.dataset.owoSubmitting === "true") return;
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            form.dataset.owoSubmitting = "true";
+            frameWindow.clearTimeout(fallbackTimer);
+
+            const button = form.querySelector('button[type="submit"], input[type="submit"]');
+            if (button) button.disabled = true;
+
+            console.info("[OwO] 登入表單已交由原生 POST 提交。");
+            frameWindow.HTMLFormElement.prototype.submit.call(form);
+        };
+
+        const scheduleFallback = (reason) => {
+            frameWindow.clearTimeout(fallbackTimer);
+            fallbackTimer = frameWindow.setTimeout(() => {
+                if (!frameDocument.contains(form)) return;
+                if (form.dataset.owoSubmitting === "true") return;
+                console.warn(`[OwO] ${reason}，執行原生登入 POST 保底。`);
+                lockAndSubmit();
+            }, 350);
+        };
+
+        form.addEventListener("submit", () => {
+            if (form.dataset.owoSubmitting === "true") return;
+            scheduleFallback("網站 Submit 未產生導覽");
+        }, true);
+
+        form.addEventListener("click", (event) => {
+            const button = event.target?.closest?.('button[type="submit"], input[type="submit"]');
+            if (!button || button.form !== form) return;
+            if (form.dataset.owoSubmitting === "true") return;
+            scheduleFallback("登入按鈕未產生導覽");
+        }, true);
+
+        console.info("[OwO] 已啟用登入提交保底 v2.4.2。");
+        return true;
+    };
+
+    if (attachToLoginForm()) return true;
+
+    const observer = new frameWindow.MutationObserver(() => {
+        if (!attachToLoginForm()) return;
+        observer.disconnect();
     });
 
-    const resolveForm = (event) => {
-        const directForm = event.target instanceof frameWindow.HTMLFormElement ? event.target : null;
-        return directForm?.id === "customer_login" ? directForm : null;
-    };
+    const observeTarget = frameDocument.documentElement || frameDocument;
+    observer.observe(observeTarget, { childList: true, subtree: true });
 
-    const nativeSubmit = (form) => {
-        if (!form || form.dataset.owoSubmitting === "true") return;
-        if (!form.checkValidity()) {
-            form.reportValidity();
-            return;
+    frameWindow.setTimeout(() => {
+        observer.disconnect();
+        if (!frameDocument.__owoLoginFallbackInstalled) {
+            console.info("[OwO] 此頁未偵測到登入表單，不啟用提交保底。");
         }
+    }, 10000);
 
-        form.dataset.owoSubmitting = "true";
-        const button = form.querySelector('button[type="submit"], input[type="submit"]');
-        if (button) button.disabled = true;
-
-        console.info("[OwO] 登入表單已交由原生 POST 提交。");
-        frameWindow.HTMLFormElement.prototype.submit.call(form);
-    };
-
-    frameDocument.addEventListener("submit", (event) => {
-        const form = resolveForm(event);
-        if (!form || form.dataset.owoSubmitting === "true") return;
-
-        queueMicrotask(() => {
-            if (!frameDocument.contains(form)) return;
-            if (form.dataset.owoSubmitting === "true") return;
-            console.warn("[OwO] 網站提交未啟動，執行登入 POST 保底。");
-            nativeSubmit(form);
-        });
-    }, true);
-
-    frameDocument.addEventListener("click", (event) => {
-        const button = event.target?.closest?.('#customer_login button[type="submit"], #customer_login input[type="submit"]');
-        if (!button) return;
-        const form = button.form || frameDocument.getElementById("customer_login");
-        if (!form || form.dataset.owoSubmitting === "true") return;
-
-        setTimeout(() => {
-            if (!frameDocument.contains(form)) return;
-            if (form.dataset.owoSubmitting === "true") return;
-            console.warn("[OwO] 登入按鈕未產生導覽，執行原生提交保底。");
-            nativeSubmit(form);
-        }, 350);
-    }, true);
-
-    console.info("[OwO] 已啟用登入提交保底 v2.4.1。");
+    return false;
 }
 
 function bindFrame(frameElement, activeController, onUrlChange) {
