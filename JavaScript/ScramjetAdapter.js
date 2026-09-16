@@ -1,7 +1,7 @@
 import { BareMuxConnection } from "../BareMux/index.mjs";
 
 const ROOT_URL = new URL("../", import.meta.url);
-const VERSION = "2.3.2";
+const VERSION = "2.4.0";
 const FILES = Object.freeze({
     serviceWorker: new URL(`sw.js?v=${VERSION}`, ROOT_URL).href,
     scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
@@ -13,12 +13,20 @@ const FILES = Object.freeze({
 
 let controller = null;
 let connection = null;
+let transportReady = null;
 let initializedWisp = "";
 let initialization = null;
 let runtimeScriptPromise = null;
 let activeFrameElement = null;
 let activeScramjetFrame = null;
 let activeUrlListener = null;
+
+try {
+    connection = new BareMuxConnection(FILES.bareMuxWorker);
+    console.info(`載入 ScramjetAdapter.js ${VERSION}`);
+} catch (error) {
+    console.warn("BareMux 預先初始化失敗，將於開啟頁面時重試。", error);
+}
 
 function ensureSecureContext() {
     if (!window.isSecureContext && location.hostname !== "localhost") {
@@ -79,6 +87,30 @@ async function ensureScramjetController() {
             all: new URL(FILES.scramjetAll).pathname,
             sync: new URL(FILES.scramjetSync).pathname,
         },
+        flags: {
+            serviceworkers: false,
+            syncxhr: false,
+            strictRewrites: false,
+            rewriterLogs: false,
+            captureErrors: false,
+            cleanErrors: false,
+            scramitize: false,
+            sourcemaps: false,
+            destructureRewrites: false,
+            interceptDownloads: false,
+            allowInvalidJs: true,
+            allowFailedIntercepts: true,
+        },
+        siteFlags: {
+            "shop\.funbox\.com\.tw": {
+                strictRewrites: false,
+                captureErrors: false,
+                scramitize: false,
+                destructureRewrites: false,
+                allowInvalidJs: true,
+                allowFailedIntercepts: true,
+            },
+        },
     });
     await Promise.resolve(controller.init());
     return controller;
@@ -104,13 +136,35 @@ async function ensureServiceWorker() {
 }
 
 async function ensureTransport(wisp) {
-    if (!connection) connection = new BareMuxConnection(FILES.bareMuxWorker);
-    if (initializedWisp !== wisp) {
-        await connection.setTransport(FILES.libcurlTransport, [{ websocket: wisp }]);
-        const transportName = await connection.getTransport();
-        if (!transportName) throw new Error("BareMux Transport 初始化失敗。");
-        initializedWisp = wisp;
-    }
+    if (initializedWisp === wisp && connection) return;
+    if (transportReady) return transportReady;
+
+    transportReady = (async () => {
+        let lastError;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+            try {
+                if (!connection) connection = new BareMuxConnection(FILES.bareMuxWorker);
+                await connection.setTransport(FILES.libcurlTransport, [{ websocket: wisp }]);
+                const transportName = await connection.getTransport();
+                if (!transportName) throw new Error("BareMux Transport 未回傳名稱。");
+                await new Promise((resolve) => setTimeout(resolve, 250));
+                const confirmedName = await connection.getTransport();
+                if (!confirmedName) throw new Error("BareMux Transport 健康檢查失敗。");
+                initializedWisp = wisp;
+                return;
+            } catch (error) {
+                lastError = error;
+                connection = null;
+                initializedWisp = "";
+                if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 350 * attempt));
+            }
+        }
+        throw new Error(`BareMux 初始化失敗：${lastError instanceof Error ? lastError.message : String(lastError)}`);
+    })().finally(() => {
+        transportReady = null;
+    });
+
+    return transportReady;
 }
 
 async function initializeRuntime(wispValue) {
@@ -174,6 +228,7 @@ window.owoScramjetAdapter = Object.freeze({
     },
     async reset() {
         initializedWisp = "";
+        transportReady = null;
         connection = null;
         activeFrameElement = null;
         activeScramjetFrame = null;
