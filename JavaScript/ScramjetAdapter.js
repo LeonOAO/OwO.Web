@@ -401,9 +401,9 @@ function recordDiagnosticError(message, stack, metadata = {}) {
 
     if (diagnosticLogState === "ON") {
         console.warn(`[OwOb Errors] ${OWOB_ERROR_CATEGORIES[category]}｜第 ${occurrence} 次`, cleanMessage, cleanStack, safeMetadata);
-    } else if (occurrence <= FIRST_NOTICE_LIMIT) {
-        console.info(`[OwOb Errors] 新增類別：${OWOB_ERROR_CATEGORIES[category]}｜累計 ${diagnosticErrorCounts[category]} 筆`);
     }
+    // Quiet mode records counts without printing one line per signature.
+    // A single grouped summary is emitted after errors stop for 8 seconds.
     scheduleDiagnosticErrorTable();
     return category;
 }
