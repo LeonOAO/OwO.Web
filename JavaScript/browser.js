@@ -331,36 +331,66 @@ function openSettings() {
 }
 
 function resolvePageFavicon(doc, pageUrl) {
-    const iconLink = doc.querySelector([
+    const iconLinks = doc.querySelectorAll([
         'link[rel~="icon"]',
         'link[rel="shortcut icon"]',
         'link[rel="apple-touch-icon"]',
         'link[rel="apple-touch-icon-precomposed"]',
     ].join(","));
 
-    try {
-        const href = iconLink?.getAttribute("href");
-        return href ? new URL(href, pageUrl).href : "";
-    } catch {
-        return "";
+    for (const iconLink of iconLinks) {
+        try {
+            const href = iconLink.getAttribute("href");
+            if (!href) continue;
+
+            const candidate = new URL(href, pageUrl);
+            if (!/^https?:$/.test(candidate.protocol)) continue;
+            if (candidate.origin === location.origin) continue;
+            return candidate.href;
+        } catch {
+            // Continue searching other icon declarations.
+        }
     }
+
+    return "";
 }
+
+let displayedSiteIconUrl = "";
 
 function setSiteIcon(favicon) {
     if (!el.siteIcon) return;
-    el.siteIcon.replaceChildren();
-    if (!favicon) {
-        el.siteIcon.textContent = "◇";
+
+    const normalized = String(favicon || "").trim();
+    if (normalized === displayedSiteIconUrl) return;
+
+    if (!normalized) {
+        displayedSiteIconUrl = "";
+        el.siteIcon.replaceChildren(document.createTextNode("◇"));
         return;
     }
 
+    let parsed;
+    try {
+        parsed = new URL(normalized);
+    } catch {
+        return;
+    }
+
+    if (!/^https?:$/.test(parsed.protocol) || parsed.origin === location.origin) return;
+
     const image = document.createElement("img");
-    image.src = favicon;
     image.alt = "";
-    image.addEventListener("error", () => {
-        el.siteIcon.replaceChildren(document.createTextNode("◇"));
+    image.addEventListener("load", () => {
+        displayedSiteIconUrl = parsed.href;
     }, { once: true });
-    el.siteIcon.append(image);
+    image.addEventListener("error", () => {
+        if (displayedSiteIconUrl === parsed.href) displayedSiteIconUrl = "";
+        if (image.isConnected) {
+            el.siteIcon.replaceChildren(document.createTextNode("◇"));
+        }
+    }, { once: true });
+    image.src = parsed.href;
+    el.siteIcon.replaceChildren(image);
 }
 
 function updateBrowserIdentity(tab) {
@@ -403,7 +433,7 @@ function readFrameIdentity() {
 
     tab.url = pageUrl;
     tab.title = pageTitle || new URL(tab.url).hostname;
-    tab.favicon = favicon;
+    if (favicon) tab.favicon = favicon;
     updateBrowserIdentity(tab);
     renderTabs();
 }
