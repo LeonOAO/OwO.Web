@@ -1,6 +1,7 @@
 "use strict";
 
-// OwO Web 2.5.4: robust Scramjet frame navigation and login-session persistence.
+// OwO Web: generic failed-background-request degradation.
+// Core navigation, authentication, form, API, upload and download requests always retain real failures.
 
 importScripts("./Scramjet/scramjet.all.js?v=2.2.1");
 
@@ -8,6 +9,7 @@ const { ScramjetServiceWorker } = self.$scramjetLoadWorker();
 const scramjet = new ScramjetServiceWorker();
 
 globalThis.__owoLoginDiagnosticLogEnabled = false;
+
 self.addEventListener("message", (event) => {
     if (event?.data?.type !== "OWOB_LOGIN_DIAGNOSTIC_LOG") return;
     globalThis.__owoLoginDiagnosticLogEnabled =
@@ -22,18 +24,30 @@ self.addEventListener("activate", (event) => {
     event.waitUntil(self.clients.claim());
 });
 
-
-const OPTIONAL_HOSTS = new Set([
-    "www.google-analytics.com",
-    "analytics.google.com",
-    "stats.g.doubleclick.net",
-    "googleads.g.doubleclick.net",
-    "www.googleadservices.com",
-    "www.clarity.ms",
-    "connect.facebook.net",
-    "tr.line.me",
-    "static.cloudflareinsights.com",
+const CORE_DESTINATIONS = new Set([
+    "document", "iframe", "frame", "script", "style", "worker",
+    "sharedworker", "serviceworker", "object", "embed", "manifest",
 ]);
+
+const DISPLAY_DESTINATIONS = new Set([
+    "image", "font", "audio", "video", "track",
+]);
+
+const ESSENTIAL_TERMS = [
+    "login", "logout", "signin", "signout", "session", "account",
+    "profile", "auth", "oauth", "token", "csrf", "xsrf", "verify",
+    "challenge", "captcha", "submit", "checkout", "payment", "purchase",
+    "order", "cart", "upload", "download", "message", "comment", "save",
+    "create", "update", "delete", "graphql", "rpc", "webhook",
+];
+
+const BACKGROUND_TERMS = [
+    "analytics", "telemetry", "metric", "metrics", "beacon", "collect",
+    "tracking", "track-event", "track_event", "event", "events", "stat",
+    "stats", "statistics", "insight", "insights", "performance", "perf",
+    "exposure", "impression", "conversion", "diagnostic", "diagnostics",
+    "rum", "pageview", "page-view", "page_view", "view-event", "heartbeat",
+];
 
 function originalTarget(requestUrl) {
     try {
@@ -46,25 +60,69 @@ function originalTarget(requestUrl) {
     }
 }
 
-function emptyOptionalResponse(request) {
+function containsTerm(value, terms) {
+    const normalized = String(value || "").toLowerCase();
+    return terms.some((term) => normalized.includes(term));
+}
+
+function isNavigationOrCore(request) {
+    return request.mode === "navigate" || CORE_DESTINATIONS.has(request.destination);
+}
+
+function isDisplayResource(request) {
+    return DISPLAY_DESTINATIONS.has(request.destination);
+}
+
+function isSafeBackgroundFailure(request, target) {
+    if (!target || isNavigationOrCore(request) || isDisplayResource(request)) return false;
+    if (request.destination !== "") return false;
+    if (request.method === "GET" || request.method === "HEAD") return false;
+
+    const semanticText = `${target.pathname} ${target.search}`.toLowerCase();
+    if (containsTerm(semanticText, ESSENTIAL_TERMS)) return false;
+
+    // Strong browser signal first; semantic matching covers XHR-based background reports.
+    return request.keepalive === true || containsTerm(semanticText, BACKGROUND_TERMS);
+}
+
+function softFailureResponse() {
+    return new Response(null, {
+        status: 204,
+        statusText: "No Content",
+        headers: {
+            "Cache-Control": "no-store",
+            "X-OwO-Background-Degraded": "1",
+        },
+    });
+}
+
+async function proxyFetchWithGenericFallback(event) {
+    const request = event.request;
     const target = originalTarget(request.url);
-    if (!target || !OPTIONAL_HOSTS.has(target.hostname)) return null;
-    if (request.destination === "script") {
-        return new Response("/* Optional telemetry disabled by OwO Web. */", {
-            status: 200,
-            headers: { "Content-Type": "application/javascript; charset=utf-8" },
-        });
+
+    try {
+        return await scramjet.fetch(event);
+    } catch (error) {
+        if (isSafeBackgroundFailure(request, target)) {
+            if (globalThis.__owoLoginDiagnosticLogEnabled) {
+                console.info("[OwOb] Background request degraded after transport failure", {
+                    method: request.method,
+                    destination: request.destination,
+                    target: target?.href || request.url,
+                    error: String(error?.message || error),
+                });
+            }
+            return softFailureResponse();
+        }
+        throw error;
     }
-    return new Response(null, { status: 204 });
 }
 
 self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
-        const optionalResponse = emptyOptionalResponse(event.request);
-        if (optionalResponse) return optionalResponse;
         await scramjet.loadConfig();
         if (scramjet.route(event)) {
-            return scramjet.fetch(event);
+            return proxyFetchWithGenericFallback(event);
         }
         return fetch(event.request);
     })());
