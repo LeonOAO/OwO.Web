@@ -113,6 +113,23 @@ function isExplicitBackgroundRequest(request, target) {
     return request.keepalive === true && shortEndpoint;
 }
 
+function isOptionalBackgroundScript(request, target) {
+    if (!target || request.destination !== "script" || request.method !== "GET") return false;
+    const text = requestDescription(request, target);
+    const security = ["challenge", "captcha", "verify", "security", "auth", "oauth", "sso", "saml", "login", "signin", "session", "token", "csrf", "xsrf", "credential", "identity", "consent", "callback", "cdn-cgi"];
+    const optional = ["analytics", "telemetry", "beacon", "metrics", "statistics", "insights", "performance", "rum", "tracking", "tag-manager", "tagmanager"];
+    if (containsAny(text, security) || containsAny(text, LOGIN_AND_STATE_TERMS)) return false;
+    return containsAny(text, optional);
+}
+
+function emptyJavaScriptResponse() {
+    return new Response("", { status: 200, headers: {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-OwO-Background-Degraded": "script",
+    }});
+}
+
 function backgroundSuccessResponse() {
     return new Response(null, {
         status: 204,
@@ -139,7 +156,13 @@ function logBackgroundDegradation(stage, request, target, detail) {
 async function handleScramjetRequest(event) {
     const request = event.request;
     const target = originalTarget(request.url);
+    const backgroundScript = isOptionalBackgroundScript(request, target);
     const background = isExplicitBackgroundRequest(request, target);
+
+    if (backgroundScript) {
+        logBackgroundDegradation("before-transport-script", request, target, "classified optional script");
+        return emptyJavaScriptResponse();
+    }
 
     // Strongly identified background reports are stopped before Transport so a
     // failed TLS handshake cannot create repeated Runtime and HTTP 500 messages.
