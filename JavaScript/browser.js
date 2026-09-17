@@ -367,34 +367,12 @@ function setSiteIcon(favicon) {
     const normalized = String(favicon || "").trim();
     if (normalized === displayedSiteIconUrl) return;
 
-    if (!normalized) {
-        displayedSiteIconUrl = "";
-        el.siteIcon.replaceChildren(document.createTextNode("◇"));
-        return;
-    }
-
-    let parsed;
-    try {
-        parsed = new URL(normalized);
-    } catch {
-        return;
-    }
-
-    if (!/^https?:$/.test(parsed.protocol) || parsed.origin === location.origin) return;
-
-    const image = document.createElement("img");
-    image.alt = "";
-    image.addEventListener("load", () => {
-        displayedSiteIconUrl = parsed.href;
-    }, { once: true });
-    image.addEventListener("error", () => {
-        if (displayedSiteIconUrl === parsed.href) displayedSiteIconUrl = "";
-        if (image.isConnected) {
-            el.siteIcon.replaceChildren(document.createTextNode("◇"));
-        }
-    }, { once: true });
-    image.src = parsed.href;
-    el.siteIcon.replaceChildren(image);
+    // The outer browser shell must not repeatedly fetch a remote site's icon.
+    // Such requests bypass the proxied page context, can trigger mixed-content
+    // or fetch failures, and were repeated by the identity timer. Keep a stable
+    // local glyph while retaining the icon URL only as tab metadata.
+    displayedSiteIconUrl = normalized;
+    el.siteIcon.replaceChildren(document.createTextNode("◇"));
 }
 
 function updateBrowserIdentity(tab) {
