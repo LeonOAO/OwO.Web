@@ -9,6 +9,7 @@ let settings = loadSettings();
 let tabs = [];
 let activeId = null;
 let identitySyncTimers = [];
+let addressNavigationPending = false;
 
 const $ = (selector) => document.querySelector(selector);
 const el = {
@@ -234,6 +235,7 @@ function testSocket(url, timeout = 8000) {
 }
 
 async function navigate(value) {
+    addressNavigationPending = true;
     try {
         const url = normalizeTarget(value);
         const tab = activeTab();
@@ -248,6 +250,8 @@ async function navigate(value) {
         await openCurrentTab();
     } catch (error) {
         showNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+        window.setTimeout(() => { addressNavigationPending = false; }, 1200);
     }
 }
 
@@ -401,6 +405,7 @@ function updateBrowserIdentity(tab) {
 }
 
 function readFrameIdentity() {
+    if (addressNavigationPending || document.activeElement === el.address) return;
     const tab = activeTab();
     if (!tab?.url) return;
 
@@ -457,7 +462,7 @@ function scheduleFrameIdentitySync() {
 }
 
 window.setInterval(() => {
-    if (!document.hidden && activeTab()?.url) readFrameIdentity();
+    if (!document.hidden && !addressNavigationPending && document.activeElement !== el.address && activeTab()?.url) readFrameIdentity();
 }, 750);
 
 $("#addTab").addEventListener("click", addTab);
