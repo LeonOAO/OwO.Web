@@ -97,7 +97,23 @@ function isExplicitBackgroundRequest(request, target) {
     // Login, session and credential semantics always win over every background signal.
     if (containsAny(description, LOGIN_AND_STATE_TERMS)) return false;
 
-    // High-risk state changes are never synthesized as successful responses.
+    // Multiple independent measurement signals identify event-only POSTs even
+    // when an event name contains words such as "submit". Navigations and login
+    // flows were already excluded by structural and state checks above.
+    const measurementSignals = [
+        /(?:^|[?&_/.-])experiment(?:[?&_/.-]|$)/i,
+        /(?:^|[?&_/.-])timeSince[A-Z_]/,
+        /(?:^|[?&_/.-])initialState(?:[?&_=.-]|$)/i,
+        /(?:^|[?&_/.-])tabPosition(?:[?&_=.-]|$)/i,
+        /(?:^|[?&_/.-])page[_-]?(?:view|home)(?:[?&_/.-]|$)/i,
+        /(?:^|[?&_/.-])percent[_-]?scrolled(?:[?&_/.-]|$)/i,
+        /\/(?:t|e)\/(?:ias|iaoi|page|event)[_-]/i,
+    ].reduce((count, pattern) => count + Number(pattern.test(description)), 0);
+
+    if (measurementSignals >= 2) return true;
+
+    // High-risk state changes retain their original behavior unless a request
+    // has already met the stronger multi-signal measurement rule above.
     if (containsAny(description, HIGH_RISK_ACTION_TERMS)) return false;
 
     // Strong background semantics win over low-risk words such as "download" when
@@ -173,6 +189,22 @@ async function handleScramjetRequest(event) {
 
     try {
         const response = await scramjet.fetch(event);
+
+        // Missing cross-origin favicons are optional display resources. Return
+        // an empty image response so a 404 does not become a page-level error.
+        if (
+            response.status === 404 &&
+            request.destination === "image" &&
+            /\.(?:ico|png|gif|jpe?g|webp)(?:$|[?#])/i.test(target?.href || "")
+        ) {
+            return new Response(null, {
+                status: 204,
+                headers: {
+                    "Cache-Control": "public, max-age=300",
+                    "X-OwO-Optional-Image-Degraded": "1",
+                },
+            });
+        }
 
         return response;
     } catch (error) {
