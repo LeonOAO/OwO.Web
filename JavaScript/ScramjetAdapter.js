@@ -363,12 +363,27 @@ function beginDiagnosticPage(url) {
 function recordDiagnosticError(message, stack, metadata = {}) {
     const cleanMessage = String(message || "未知錯誤");
     const cleanStack = String(stack || "");
-    const category = classifyDiagnosticError(cleanMessage, `${cleanStack}\n${JSON.stringify(metadata)}`);
+    const diagnosticText = `${cleanMessage}\n${cleanStack}\n${JSON.stringify(metadata)}`;
+
+    // Runtime startup and rewrite advisory messages are informational. They do
+    // not represent page compatibility failures and must not enter statistics.
+    if (/bare-mux:|initializing scramjet client|Creating SingletonBox|last version of scramjet v1|extraneous query parameter|Assuming <form> element/i.test(diagnosticText) &&
+        !/Request failed|SSL connect error|Internal Server Error|net::ERR_|Session lock is unavailable/i.test(diagnosticText)) {
+        return null;
+    }
+
+    const category = classifyDiagnosticError(cleanMessage, diagnosticText);
+    const signature = diagnosticSignature(category, cleanMessage, cleanStack);
+    const priorOccurrence = diagnosticErrorSignatures.get(signature) || 0;
+    const occurrence = priorOccurrence + 1;
+    diagnosticErrorSignatures.set(signature, occurrence);
+
+    // One root signature counts once even when console.error, error and
+    // unhandledrejection report the same failure through separate channels.
+    if (priorOccurrence > 0) return category;
+
     diagnosticErrorCounts[category] += 1;
     diagnosticErrorsSinceLastSummary += 1;
-    const signature = diagnosticSignature(category, cleanMessage, cleanStack);
-    const occurrence = (diagnosticErrorSignatures.get(signature) || 0) + 1;
-    diagnosticErrorSignatures.set(signature, occurrence);
 
     if (diagnosticLogState === "ON") {
         console.warn(`[OwOb Errors] ${OWOB_ERROR_CATEGORIES[category]}｜第 ${occurrence} 次`, cleanMessage, cleanStack, metadata);
