@@ -477,17 +477,32 @@ $("#reload").addEventListener("click", async () => {
         return;
     }
 
-    el.status.textContent = "正在重新連線";
+    el.status.textContent = "正在重新整理目前頁面";
     el.progress.classList.add("loading");
 
+    // Capture the live proxy URL before any fallback action. This preserves
+    // redirects, form destinations, hash routes and SPA navigation state.
+    const liveFrameUrl = el.frame.contentWindow?.location?.href || el.frame.src;
+
     try {
-        el.frame.src = "about:blank";
-        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        await openCurrentTab();
-    } catch (error) {
-        showNotice(error instanceof Error ? error.message : String(error));
-    } finally {
-        el.progress.classList.remove("loading");
+        readFrameIdentity();
+        el.frame.contentWindow.location.reload();
+    } catch (reloadError) {
+        try {
+            // Reassign the exact live iframe URL instead of rebuilding from
+            // tab.url, which may still contain an earlier outer-tab address.
+            if (liveFrameUrl && liveFrameUrl !== "about:blank") {
+                el.frame.src = liveFrameUrl;
+            } else {
+                await openCurrentTab();
+            }
+        } catch (fallbackError) {
+            showNotice(
+                fallbackError instanceof Error
+                    ? fallbackError.message
+                    : String(fallbackError)
+            );
+        }
     }
 });
 $("#settings").addEventListener("click", openSettings);
