@@ -370,9 +370,9 @@ function sanitizeDiagnosticText(value) {
 }
 
 function recordDiagnosticError(message, stack, metadata = {}) {
-    // Compatibility telemetry is opt-in. When OFF it emits no classifications,
-    // summaries or copies of rewritten URLs and cannot influence page behavior.
-    if (diagnosticLogState !== "ON") return null;
+    // Counting remains active in quiet mode so failures are still discoverable.
+    // Detailed messages, stacks, metadata and rewritten URLs are emitted only
+    // when OwOb.Log is ON. This observer never changes request or login behavior.
 
     const cleanMessage = sanitizeDiagnosticText(message || "未知錯誤");
     const cleanStack = sanitizeDiagnosticText(stack || "");
