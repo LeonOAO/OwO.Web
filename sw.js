@@ -4,7 +4,7 @@
 // Authentication, session, account, form, API mutation, upload and download
 // traffic always follows the original Scramjet result and error behavior.
 
-importScripts("./Scramjet/scramjet.all.js?v=2.2.1");
+importScripts("./Scramjet/scramjet.all.js");
 
 const { ScramjetServiceWorker } = self.$scramjetLoadWorker();
 const scramjet = new ScramjetServiceWorker();
@@ -59,12 +59,31 @@ const STRONG_BACKGROUND_TERMS = [
     "event_log", "client-event", "client_event",
 ];
 
+function decodeProxyTarget(value) {
+    let decoded = String(value || "");
+    for (let pass = 0; pass < 3; pass += 1) {
+        try {
+            const next = decodeURIComponent(decoded);
+            if (next === decoded) break;
+            decoded = next;
+        } catch {
+            break;
+        }
+    }
+    return decoded;
+}
+
 function originalTarget(requestUrl) {
     try {
+        const parsedRequest = new URL(requestUrl);
         const marker = "/scramjet/";
-        const index = requestUrl.indexOf(marker);
+        const index = parsedRequest.pathname.indexOf(marker);
         if (index < 0) return null;
-        return new URL(decodeURIComponent(requestUrl.slice(index + marker.length)));
+
+        const encodedPath = parsedRequest.pathname.slice(index + marker.length);
+        const decodedPath = decodeProxyTarget(encodedPath);
+        const candidate = `${decodedPath}${parsedRequest.search}${parsedRequest.hash}`;
+        return new URL(candidate);
     } catch {
         return null;
     }
@@ -190,13 +209,29 @@ function logBackgroundDegradation(stage, request, target, detail) {
     });
 }
 
+function challengeResourceKind(request, target) {
+    if (request.method !== "GET") return "";
+
+    const accept = String(request.headers.get("accept") || "").toLowerCase();
+    const destination = String(request.destination || "").toLowerCase();
+    const values = [target?.pathname || "", target?.href || "", request.url || ""]
+        .map(decodeProxyTarget);
+    const challengePath = values.find((value) =>
+        /\/cdn-cgi\/challenge-platform\//i.test(value)
+    ) || "";
+
+    if (!challengePath) return "";
+
+    const javascriptResource =
+        destination === "script" ||
+        /javascript|ecmascript/.test(accept) ||
+        /\/(?:scripts\/)?jsd\/[^?#]+(?:\.js)?(?:[?#]|$)/i.test(challengePath);
+
+    return javascriptResource ? "javascript" : "";
+}
+
 function isGeneratedChallengeScript(request, target) {
-    if (request.method !== "GET") return false;
-    const values = [target?.pathname || "", target?.href || "", request.url || ""];
-    for (const value of [...values]) {
-        try { values.push(decodeURIComponent(value)); } catch (_) {}
-    }
-    return values.some((value) => /\/cdn-cgi\/challenge-platform\/scripts\/jsd\/main\.js(?:[?#]|$)/i.test(value));
+    return challengeResourceKind(request, target) === "javascript";
 }
 
 async function handleScramjetRequest(event) {
@@ -231,7 +266,8 @@ async function handleScramjetRequest(event) {
                 for (const value of [...values]) {
                     try { values.push(decodeURIComponent(value)); } catch (_) {}
                 }
-                return values.some((value) => /\/cdn-cgi\/challenge-platform\//i.test(value));
+                return challengeResourceKind(request, target) === "javascript" ||
+                    values.some((value) => /\/cdn-cgi\/challenge-platform\/(?:scripts\/)?jsd\//i.test(decodeProxyTarget(value)));
             })()
         ) {
             return emptyJavaScriptResponse();
