@@ -234,6 +234,52 @@ function isGeneratedChallengeScript(request, target) {
     return challengeResourceKind(request, target) === "javascript";
 }
 
+function optionalThirdPartyDegradeKind(request, target) {
+    if (String(request.method || "").toUpperCase() !== "GET") return "";
+
+    const href = String(target?.href || "");
+    const host = String(target?.hostname || "").toLowerCase();
+    const path = String(target?.pathname || "");
+
+    if (host === "connect.facebook.net" && /\/sdk\/xfbml\.customerchat\.js$/i.test(path)) {
+        return "javascript";
+    }
+    if (host === "www.clarity.ms" && /^\/tag\//i.test(path)) {
+        return "javascript";
+    }
+    if (host === "message.cyberbiz.io" && /\/api\/widgets\/[^/]+\/verify$/i.test(path)) {
+        return "widget-json";
+    }
+    if (/^(?:https?:)?\/\/connect\.facebook\.net\/.*\/sdk\/xfbml\.customerchat\.js/i.test(href)) {
+        return "javascript";
+    }
+    return "";
+}
+
+function optionalThirdPartyDegradedResponse(kind) {
+    if (kind === "javascript") {
+        return new Response("", {
+            status: 200,
+            headers: {
+                "Content-Type": "application/javascript; charset=utf-8",
+                "Cache-Control": "no-store",
+                "X-OwO-Optional-Service-Degraded": "1",
+            },
+        });
+    }
+    if (kind === "widget-json") {
+        return new Response(JSON.stringify({ enabled: false, available: false }), {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Cache-Control": "no-store",
+                "X-OwO-Optional-Service-Degraded": "1",
+            },
+        });
+    }
+    return null;
+}
+
 function isRawMissingChallengeScriptRequest(request) {
     if (String(request.method || "").toUpperCase() !== "GET") return false;
 
@@ -260,6 +306,22 @@ async function handleScramjetRequest(event) {
     const target = originalTarget(request.url);
     const backgroundScript = isOptionalBackgroundScript(request, target);
     const background = isExplicitBackgroundRequest(request, target);
+    const optionalThirdPartyKind = optionalThirdPartyDegradeKind(request, target);
+
+    if (optionalThirdPartyKind) {
+        event.waitUntil(publishServiceDiagnostic(
+            `Optional ${target?.hostname || "third-party"} service skipped`,
+            {
+                service: target?.hostname || "third-party",
+                targetPath: target?.pathname || "",
+                status: 200,
+                method: request.method,
+                destination: request.destination || "unknown",
+                degraded: true,
+            }
+        ));
+        return optionalThirdPartyDegradedResponse(optionalThirdPartyKind);
+    }
 
     if (isGeneratedChallengeScript(request, target)) return emptyJavaScriptResponse();
 
