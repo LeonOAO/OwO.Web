@@ -244,6 +244,17 @@ function isRawMissingChallengeScriptRequest(request) {
     );
 }
 
+async function publishServiceDiagnostic(message, metadata = {}) {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+        client.postMessage({
+            type: "OWOB_SERVICE_DIAGNOSTIC",
+            message: String(message || "Proxy service diagnostic"),
+            metadata,
+        });
+    }
+}
+
 async function handleScramjetRequest(event) {
     const request = event.request;
     const target = originalTarget(request.url);
@@ -266,6 +277,30 @@ async function handleScramjetRequest(event) {
 
     try {
         const response = await scramjet.fetch(event);
+
+        if (response.status >= 400) {
+            const targetText = target?.href || request.url;
+            const optionalService = /connect\.facebook\.net|message\.cyberbiz\.io|clarity\.ms/i.test(targetText);
+            if (optionalService) {
+                let service = "third-party";
+                let targetPath = "";
+                try {
+                    const parsedTarget = new URL(targetText);
+                    service = parsedTarget.hostname;
+                    targetPath = parsedTarget.pathname;
+                } catch (_) {}
+                event.waitUntil(publishServiceDiagnostic(
+                    `${service} returned HTTP ${response.status}`,
+                    {
+                        service,
+                        targetPath,
+                        status: response.status,
+                        method: request.method,
+                        destination: request.destination || "unknown",
+                    }
+                ));
+            }
+        }
 
         // A challenge script keeps its real request, redirects and cookies. Only
         // a final 404 is converted to valid empty JavaScript to avoid page noise.
