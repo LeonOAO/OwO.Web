@@ -424,13 +424,24 @@ function readFrameIdentity() {
 
     try {
         const parsed = new URL(pageUrl);
-        if (parsed.origin === location.origin && tab.url) {
-            pageUrl = tab.url;
+        if (parsed.origin === location.origin) {
+            const marker = "/scramjet/";
+            const markerIndex = parsed.pathname.indexOf(marker);
+            if (markerIndex >= 0) {
+                const encodedTarget = parsed.pathname.slice(markerIndex + marker.length) + parsed.search + parsed.hash;
+                const candidates = [encodedTarget];
+                try { candidates.push(decodeURIComponent(encodedTarget)); } catch (_) {}
+                const decodedTarget = candidates.find((value) => /^https?:\/\//i.test(value));
+                pageUrl = decodedTarget || tab.url;
+            } else {
+                pageUrl = tab.url;
+            }
         }
     } catch {
         pageUrl = tab.url;
     }
 
+    if (pageUrl === tab.url && !pageTitle && !favicon) return;
     tab.url = pageUrl;
     tab.title = pageTitle || new URL(tab.url).hostname;
     if (favicon) tab.favicon = favicon;
@@ -440,10 +451,14 @@ function readFrameIdentity() {
 
 function scheduleFrameIdentitySync() {
     clearIdentitySyncTimers();
-    [100, 500, 1200, 2500].forEach((delay) => {
+    [50, 150, 350, 700, 1200, 2000, 3500, 5500, 8000, 12000].forEach((delay) => {
         identitySyncTimers.push(window.setTimeout(readFrameIdentity, delay));
     });
 }
+
+window.setInterval(() => {
+    if (!document.hidden && activeTab()?.url) readFrameIdentity();
+}, 750);
 
 $("#addTab").addEventListener("click", addTab);
 $("#addressForm").addEventListener("submit", (event) => {
