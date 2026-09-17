@@ -32,6 +32,7 @@ const OPTIONAL_HOSTS = new Set([
     "www.clarity.ms",
     "connect.facebook.net",
     "tr.line.me",
+    "static.cloudflareinsights.com",
 ]);
 
 function originalTarget(requestUrl) {
