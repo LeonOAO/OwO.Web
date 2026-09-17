@@ -39,12 +39,16 @@ const LOGIN_AND_STATE_TERMS = [
     "captcha", "mfa", "2fa", "otp", "callback", "consent",
 ];
 
-const USER_ACTION_TERMS = [
+const HIGH_RISK_ACTION_TERMS = [
     "submit", "save", "create", "update", "delete", "remove", "edit",
-    "send", "message", "comment", "reply", "post", "publish", "follow",
-    "like", "vote", "subscribe", "unsubscribe", "checkout", "payment",
-    "purchase", "order", "cart", "upload", "download", "attachment",
-    "graphql", "mutation", "rpc", "webhook",
+    "send", "message", "comment", "reply", "publish", "follow", "like",
+    "vote", "subscribe", "unsubscribe", "checkout", "payment", "purchase",
+    "order", "cart", "upload", "attachment", "graphql", "mutation", "rpc",
+    "webhook",
+];
+
+const LOW_RISK_ACTION_TERMS = [
+    "download",
 ];
 
 const STRONG_BACKGROUND_TERMS = [
@@ -77,23 +81,31 @@ function requestDescription(request, target) {
     return `${target?.pathname || ""} ${target?.search || ""} ${contentType} ${accept}`.toLowerCase();
 }
 
-function isProtectedRequest(request, target) {
+function isStructurallyProtectedRequest(request, target) {
     if (!target) return true;
     if (request.mode === "navigate") return true;
     if (CORE_DESTINATIONS.has(request.destination)) return true;
-    if (request.method === "GET" || request.method === "HEAD") return true;
-
-    const description = requestDescription(request, target);
-    return containsAny(description, LOGIN_AND_STATE_TERMS) ||
-        containsAny(description, USER_ACTION_TERMS);
+    return request.method === "GET" || request.method === "HEAD";
 }
 
 function isExplicitBackgroundRequest(request, target) {
-    if (isProtectedRequest(request, target)) return false;
+    if (isStructurallyProtectedRequest(request, target)) return false;
     if (request.destination !== "") return false;
 
     const description = requestDescription(request, target);
+
+    // Login, session and credential semantics always win over every background signal.
+    if (containsAny(description, LOGIN_AND_STATE_TERMS)) return false;
+
+    // High-risk state changes are never synthesized as successful responses.
+    if (containsAny(description, HIGH_RISK_ACTION_TERMS)) return false;
+
+    // Strong background semantics win over low-risk words such as "download" when
+    // the complete phrase describes an impression or measurement event.
     if (containsAny(description, STRONG_BACKGROUND_TERMS)) return true;
+
+    // A real download-like endpoint remains protected when no background semantics exist.
+    if (containsAny(description, LOW_RISK_ACTION_TERMS)) return false;
 
     // sendBeacon and fetch keepalive provide a browser-level background signal.
     // A short endpoint is accepted only with this signal, never from its path alone.
@@ -139,26 +151,11 @@ async function handleScramjetRequest(event) {
     try {
         const response = await scramjet.fetch(event);
 
-        // This branch handles transports that convert an exception to an HTTP 5xx.
-        // Protected requests never enter this branch because background is false.
-        if (background && response.status >= 500) {
-            logBackgroundDegradation("after-response", request, target, `HTTP ${response.status}`);
-            return backgroundSuccessResponse();
-        }
-
         return response;
     } catch (error) {
-        // Preserve the original exception for every non-background request,
-        // including all authentication and state-changing operations.
-        if (!background) throw error;
-
-        logBackgroundDegradation(
-            "after-exception",
-            request,
-            target,
-            String(error?.message || error)
-        );
-        return backgroundSuccessResponse();
+        // Every request reaching Transport is protected or unclassified, so its
+        // original exception is preserved for authentication and application logic.
+        throw error;
     }
 }
 
