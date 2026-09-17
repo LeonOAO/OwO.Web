@@ -190,11 +190,22 @@ function logBackgroundDegradation(stage, request, target, detail) {
     });
 }
 
+function isGeneratedChallengeScript(request, target) {
+    if (request.method !== "GET") return false;
+    const values = [target?.pathname || "", target?.href || "", request.url || ""];
+    for (const value of [...values]) {
+        try { values.push(decodeURIComponent(value)); } catch (_) {}
+    }
+    return values.some((value) => /\/cdn-cgi\/challenge-platform\/scripts\/jsd\/main\.js(?:[?#]|$)/i.test(value));
+}
+
 async function handleScramjetRequest(event) {
     const request = event.request;
     const target = originalTarget(request.url);
     const backgroundScript = isOptionalBackgroundScript(request, target);
     const background = isExplicitBackgroundRequest(request, target);
+
+    if (isGeneratedChallengeScript(request, target)) return emptyJavaScriptResponse();
 
     if (backgroundScript) {
         logBackgroundDegradation("before-transport-script", request, target, "classified optional script");
@@ -215,7 +226,6 @@ async function handleScramjetRequest(event) {
         // a final 404 is converted to valid empty JavaScript to avoid page noise.
         if (
             response.status === 404 &&
-            request.destination === "script" &&
             (() => {
                 const values = [target?.pathname || "", target?.href || "", request.url || "", response.url || ""];
                 for (const value of [...values]) {
