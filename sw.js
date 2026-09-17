@@ -216,7 +216,13 @@ async function handleScramjetRequest(event) {
         if (
             response.status === 404 &&
             request.destination === "script" &&
-            /\/cdn-cgi\/challenge-platform\//i.test(target?.pathname || "")
+            (() => {
+                const values = [target?.pathname || "", target?.href || "", request.url || "", response.url || ""];
+                for (const value of [...values]) {
+                    try { values.push(decodeURIComponent(value)); } catch (_) {}
+                }
+                return values.some((value) => /\/cdn-cgi\/challenge-platform\//i.test(value));
+            })()
         ) {
             return emptyJavaScriptResponse();
         }
