@@ -1,1 +1,400 @@
-import{BareMuxConnection}from'../BareMux/index.mjs';const ROOT_URL=new URL('../',import.meta.url),FILES=Object['freeze']({'serviceWorker':new URL('sw.js',ROOT_URL)['href'],'scramjetAll':new URL('Scramjet/scramjet.all.js',ROOT_URL)['href'],'scramjetWasm':new URL('Scramjet/scramjet.wasm.wasm',ROOT_URL)['href'],'scramjetSync':new URL('Scramjet/scramjet.sync.js',ROOT_URL)['href'],'bareMuxWorker':new URL('BareMux/worker.js',ROOT_URL)['href'],'libcurlTransport':new URL('Transport/index.mjs',ROOT_URL)['href']}),OWOB_LOG_STORAGE_KEY='owo.browser.loginDiagnosticLog',OWOB_LOG_MESSAGE_TYPE='OWOB_LOGIN_DIAGNOSTIC_LOG';let controller=null,connection=null,initializedWisp='',initialization=null,runtimeScriptPromise=null,diagnosticLogState=readDiagnosticLogState();function normalizeDiagnosticLogState(_0x2eca2e){return String(_0x2eca2e||'')['trim']()['toUpperCase']()==='ON'?'ON':'OFF';}function readDiagnosticLogState(){try{return normalizeDiagnosticLogState(window['localStorage']['getItem'](OWOB_LOG_STORAGE_KEY)||'OFF');}catch(_0x28d25e){return'OFF';}}function sendDiagnosticLogState(_0x4c6293){const _0x17af5b=_0x4c6293||navigator['serviceWorker']['controller'];if(!_0x17af5b)return![];return _0x17af5b['postMessage']({'type':OWOB_LOG_MESSAGE_TYPE,'value':diagnosticLogState}),!![];}function publishDiagnosticLogState(_0x5ac9ae){sendDiagnosticLogState(_0x5ac9ae?.['active']),sendDiagnosticLogState(_0x5ac9ae?.['waiting']),sendDiagnosticLogState(_0x5ac9ae?.['installing']),sendDiagnosticLogState();}function setDiagnosticLogState(_0x5ece08){diagnosticLogState=normalizeDiagnosticLogState(_0x5ece08);try{window['localStorage']['setItem'](OWOB_LOG_STORAGE_KEY,diagnosticLogState);}catch(_0x5433bb){}publishDiagnosticLogState(),console['info']('[OwOb]\x20Login\x20diagnostic\x20log:\x20'+diagnosticLogState);if(diagnosticLogState==='OFF')printDiagnosticErrorTable('切換為計數模式');return diagnosticLogState;}function initializeDiagnosticLogControl(){const _0x468130=globalThis['OwOb']&&typeof globalThis['OwOb']==='object'?globalThis['OwOb']:{};Object['defineProperty'](_0x468130,'Log',{'configurable':!![],'enumerable':!![],'get'(){return diagnosticLogState;},'set'(_0x3ef743){setDiagnosticLogState(_0x3ef743);}}),globalThis['OwOb']=_0x468130;const _0x392345={};Object['defineProperties'](_0x392345,{'List':{'enumerable':!![],'value':()=>{return printDiagnosticErrorTable(),{...diagnosticErrorCounts};}},'Clear':{'enumerable':!![],'value':()=>clearDiagnosticErrors(!![])},'Counts':{'enumerable':!![],'get':()=>({...diagnosticErrorCounts})}}),Object['defineProperty'](_0x468130,'Errors',{'configurable':!![],'enumerable':!![],'value':_0x392345}),navigator['serviceWorker']['addEventListener']('controllerchange',()=>{sendDiagnosticLogState();}),console['info']('[OwOb]\x20Login\x20diagnostic\x20log:\x20'+diagnosticLogState),console['info']('[OwOb]\x20輸入\x20OwOb.Log\x20=\x20\x22'+(diagnosticLogState==='ON'?'OFF':'ON')+'\x22\x20'+((diagnosticLogState==='ON'?'關閉':'開啟')+'登入診斷紀錄'));}function ensureSecureContext(){if(!window['isSecureContext']&&location['hostname']!=='localhost')throw new Error('Scramjet\x20需要\x20HTTPS\x20或\x20localhost，無法從\x20file://\x20直接啟動。');if(!('serviceWorker'in navigator))throw new Error('目前瀏覽器不支援\x20Service\x20Worker。');if(!('SharedWorker'in window))throw new Error('目前瀏覽器不支援\x20Bare-Mux\x20所需的\x20SharedWorker。');}function validateWisp(_0x3ea170){const _0x120dd9=new URL(String(_0x3ea170||'')['trim']());if(!/^wss?:$/['test'](_0x120dd9['protocol']))throw new Error('Wisp\x20位址必須使用\x20ws://\x20或\x20wss://。');if(location['protocol']==='https:'&&_0x120dd9['protocol']!=='wss:')throw new Error('HTTPS\x20網站只能使用\x20wss://\x20Wisp。');return _0x120dd9['href'];}function loadRuntimeScript(){if(typeof window['$scramjetLoadController']==='function')return Promise['resolve']();if(runtimeScriptPromise)return runtimeScriptPromise;return runtimeScriptPromise=new Promise((_0x3a4c9e,_0xade3c)=>{const _0x4b9a42=document['querySelector']('script[data-owo-scramjet-runtime=\x22true\x22]'),_0x5dc868=_0x4b9a42||document['createElement']('script'),_0x5cab1b=()=>{typeof window['$scramjetLoadController']==='function'?_0x3a4c9e():(runtimeScriptPromise=null,_0xade3c(new Error('Scramjet\x20Runtime\x20已下載，但控制器介面未建立。請清除網站快取後重試。')));},_0x44e41e=()=>{runtimeScriptPromise=null,_0xade3c(new Error('Scramjet\x20Runtime\x20載入失敗：'+FILES['scramjetAll']));};_0x5dc868['addEventListener']('load',_0x5cab1b,{'once':!![]}),_0x5dc868['addEventListener']('error',_0x44e41e,{'once':!![]}),!_0x4b9a42&&(_0x5dc868['src']=FILES['scramjetAll'],_0x5dc868['async']=!![],_0x5dc868['dataset']['owoScramjetRuntime']='true',document['head']['appendChild'](_0x5dc868));}),runtimeScriptPromise;}async function ensureScramjetController(){if(controller)return controller;await loadRuntimeScript();const _0x4af93b=window['$scramjetLoadController'];if(typeof _0x4af93b!=='function')throw new Error('Scramjet\x20Runtime\x20控制器載入失敗。');const {ScramjetController:_0x5e7415}=_0x4af93b();return controller=new _0x5e7415({'prefix':ROOT_URL['pathname']+'scramjet/','files':{'wasm':new URL(FILES['scramjetWasm'])['pathname'],'all':new URL(FILES['scramjetAll'])['pathname'],'sync':new URL(FILES['scramjetSync'])['pathname']}}),await Promise['resolve'](controller['init']()),controller;}async function ensureServiceWorker(){const _0xf41f49=await navigator['serviceWorker']['register'](FILES['serviceWorker'],{'scope':ROOT_URL['pathname'],'updateViaCache':'none'});return await navigator['serviceWorker']['ready'],publishDiagnosticLogState(_0xf41f49),_0xf41f49;}async function ensureTransport(_0x119f16){!connection&&(connection=new BareMuxConnection(FILES['bareMuxWorker'])),initializedWisp!==_0x119f16&&(await connection['setTransport'](FILES['libcurlTransport'],[{'websocket':_0x119f16}]),initializedWisp=_0x119f16);}async function initializeRuntime(_0x574929){const _0x3eae8b=validateWisp(_0x574929);return!initialization&&(initialization=(async()=>{ensureSecureContext(),await ensureTransport(_0x3eae8b),await ensureScramjetController(),await ensureServiceWorker();})()['catch'](_0x3c1ee2=>{initialization=null;throw _0x3c1ee2;})),await initialization,await ensureTransport(_0x3eae8b),controller;}const OWOB_ERROR_CATEGORIES=Object['freeze']({'bareMuxInitialization':'Bare-Mux\x20初始化','serviceWorkerRuntime':'Service\x20Worker\x20執行','transportTls':'Transport／TLS\x20連線','optionalNetwork':'選用服務網路','mainDocumentNetwork':'主文件網路','requiredApiNetwork':'必要\x20API\x20網路','loginSessionChain':'登入\x20Session\x20鏈','cookieCsrf':'Cookie／CSRF\x20配對','arrayCompatibility':'Array\x20相容性','selectorCompatibility':'Selector\x20相容性','readonlyArray':'唯讀陣列','iteratorCompatibility':'Iterator\x20相容性','touchEventCompatibility':'TouchEvent\x20相容性','urlRewriteCompatibility':'URL\x20重寫相容性','reactHydrationCompatibility':'React／Hydration\x20相容性','moduleLoadingCompatibility':'模組載入相容性','scriptLoading':'JavaScript\x20載入','resourceLoading':'靜態資源載入','widgetValidation':'聊天元件驗證','permissionSecurity':'權限／安全限制','unknown':'未分類錯誤'}),QUIET_TABLE_DELAY_MS=0x1f40,FIRST_NOTICE_LIMIT=0x1;let diagnosticErrorCounts=createDiagnosticErrorCounts(),diagnosticErrorPageKey='',diagnosticErrorPrintTimer=null,diagnosticErrorSignatures=new Map();function createDiagnosticErrorCounts(){return Object['fromEntries'](Object['keys'](OWOB_ERROR_CATEGORIES)['map'](_0xdc4c87=>[_0xdc4c87,0x0]));}function normalizeDiagnosticText(_0x49942f){return String(_0x49942f||'')['replace'](/https?:\/\/[^\s)]+/gi,'<URL>')['replace'](/:\d+:\d+/g,':#:#')['replace'](/\b\d{4,}\b/g,'#')['replace'](/\s+/g,'\x20')['trim']();}function classifyDiagnosticError(_0xe0bf3e,_0x18cbd9){const _0x30bb3c=_0xe0bf3e+'\x0a'+_0x18cbd9;if(/invalid MessagePort|All clients returned an invalid MessagePort|bare-mux SharedWorker/i['test'](_0x30bb3c))return'bareMuxInitialization';if(/ERROR FROM SERVICE WORKER|Service Worker.*(?:failed|error)|Failed to register.*Service Worker/i['test'](_0x30bb3c))return'serviceWorkerRuntime';if(/error code 35|SSL connect error|TLS|certificate/i['test'](_0x30bb3c))return/improving\.|analytics|telemetry|doubleclick|googletagmanager/i['test'](_0x30bb3c)?'optionalNetwork':'transportTls';if(/improving\.|analytics|telemetry|doubleclick|googletagmanager|webvitals|wide_event/i['test'](_0x30bb3c))return'optionalNetwork';if(/login|session-chain|Session Lock|csrfMatches|sessionMatches/i['test'](_0x30bb3c)&&/false|failed|mismatch|error/i['test'](_0x30bb3c))return'loginSessionChain';if(/cookie|csrf|xsrf|authenticity/i['test'](_0x30bb3c)&&/false|failed|mismatch|invalid/i['test'](_0x30bb3c))return'cookieCsrf';if(/Array\.prototype\.|comparison function|Cannot convert undefined or null to object/i['test'](_0x30bb3c))return'arrayCompatibility';if(/querySelector|querySelectorAll|matches.*valid selector|selector is empty/i['test'](_0x30bb3c))return'selectorCompatibility';if(/read only property ['"]length|Cannot add property.*not extensible|Array\.push/i['test'](_0x30bb3c))return'readonlyArray';if(/Constructor Iterator requires ['"]new|Iterator/i['test'](_0x30bb3c))return'iteratorCompatibility';if(/TouchEvent|provided event type.*invalid/i['test'](_0x30bb3c))return'touchEventCompatibility';if(/Failed to construct ['"]URL|Invalid URL|URL constructor/i['test'](_0x30bb3c))return'urlRewriteCompatibility';if(/Minified React error|hydration|Hydration|ReactDOM/i['test'](_0x30bb3c))return'reactHydrationCompatibility';if(/Cannot find module|ChunkLoadError|Loading chunk .* failed|dynamic import/i['test'](_0x30bb3c))return'moduleLoadingCompatibility';if(/Failed to load script|script.*(?:failed|error)|SyntaxError.*module/i['test'](_0x30bb3c))return'scriptLoading';if(/widget key|CHAT BOX|Unprocessable Content/i['test'](_0x30bb3c))return'widgetValidation';if(/SecurityError|NotAllowedError|Permission denied|blocked by/i['test'](_0x30bb3c))return'permissionSecurity';if(/Failed to load resource|HTTP [45]\d\d|status of [45]\d\d/i['test'](_0x30bb3c))return'resourceLoading';return'unknown';}function diagnosticSignature(_0x321df9,_0x249495,_0x2cf59a){const _0xd4b514=String(_0x2cf59a||'')['split']('\x0a')['find'](_0x3da630=>/\bat\b|https?:/i['test'](_0x3da630))||'';return _0x321df9+'|'+normalizeDiagnosticText(_0x249495)+'|'+normalizeDiagnosticText(_0xd4b514);}function printDiagnosticErrorTable(_0x1815c9='目前頁面'){console['groupCollapsed']('[OwOb\x20Errors]\x20統計表｜'+_0x1815c9);for(const [_0xae230c,_0x39eb63]of Object['entries'](OWOB_ERROR_CATEGORIES)){console['info'](_0x39eb63+'：'+diagnosticErrorCounts[_0xae230c]);}console['info']('錯誤簽章：'+diagnosticErrorSignatures['size']),console['groupEnd']();}function scheduleDiagnosticErrorTable(){if(diagnosticLogState==='ON')return;if(diagnosticErrorPrintTimer)clearTimeout(diagnosticErrorPrintTimer);diagnosticErrorPrintTimer=window['setTimeout'](()=>{diagnosticErrorPrintTimer=null,printDiagnosticErrorTable('錯誤停止\x208\x20秒後摘要');},QUIET_TABLE_DELAY_MS);}function clearDiagnosticErrors(_0x139e1c=!![]){diagnosticErrorCounts=createDiagnosticErrorCounts(),diagnosticErrorSignatures=new Map();diagnosticErrorPrintTimer&&(clearTimeout(diagnosticErrorPrintTimer),diagnosticErrorPrintTimer=null);if(_0x139e1c)console['info']('[OwOb\x20Errors]\x20統計表已清除');return printDiagnosticErrorTable('新頁面歸零'),{...diagnosticErrorCounts};}function beginDiagnosticPage(_0x2369ab){const _0x3ae389=String(_0x2369ab||'');if(_0x3ae389===diagnosticErrorPageKey)return;diagnosticErrorPageKey=_0x3ae389,clearDiagnosticErrors(![]);}function recordDiagnosticError(_0x1e970d,_0x3efe45,_0x1328d5={}){const _0x1a137e=String(_0x1e970d||'未知錯誤'),_0x51e118=String(_0x3efe45||''),_0xa3f7c9=classifyDiagnosticError(_0x1a137e,_0x51e118+'\x0a'+JSON['stringify'](_0x1328d5));diagnosticErrorCounts[_0xa3f7c9]+=0x1;const _0x5603bd=diagnosticSignature(_0xa3f7c9,_0x1a137e,_0x51e118),_0x37e106=(diagnosticErrorSignatures['get'](_0x5603bd)||0x0)+0x1;diagnosticErrorSignatures['set'](_0x5603bd,_0x37e106);if(diagnosticLogState==='ON')console['warn']('[OwOb\x20Errors]\x20'+OWOB_ERROR_CATEGORIES[_0xa3f7c9]+'｜第\x20'+_0x37e106+'\x20次',_0x1a137e,_0x51e118,_0x1328d5);else _0x37e106<=FIRST_NOTICE_LIMIT&&console['info']('[OwOb\x20Errors]\x20新增類別：'+OWOB_ERROR_CATEGORIES[_0xa3f7c9]+'｜累計\x20'+diagnosticErrorCounts[_0xa3f7c9]+'\x20筆');return scheduleDiagnosticErrorTable(),_0xa3f7c9;}window['addEventListener']('message',_0x5a562e=>{const _0x2609c1=_0x5a562e['data'];if(!_0x2609c1||_0x2609c1['type']!=='OWOB_COMPATIBILITY_ERROR')return;recordDiagnosticError(_0x2609c1['message'],_0x2609c1['stack'],_0x2609c1['metadata']||{});}),window['addEventListener']('error',_0x3a76d9=>{if(!_0x3a76d9['error']&&!_0x3a76d9['message'])return;recordDiagnosticError(_0x3a76d9['message'],_0x3a76d9['error']?.['stack']||'',{'source':_0x3a76d9['filename']||'window'});}),window['addEventListener']('unhandledrejection',_0x681f53=>{const _0x595f35=_0x681f53['reason'];recordDiagnosticError(_0x595f35?.['message']||_0x595f35,_0x595f35?.['stack']||'',{'source':'unhandledrejection'});}),initializeDiagnosticLogControl(),window['owoScramjetAdapter']=Object['freeze']({async 'getUrl'({target:_0x11c2ef,wisp:_0x3fe70f}){const _0x3701c8=new URL(_0x11c2ef)['href'];beginDiagnosticPage(_0x3701c8);const _0x2d6fc0=await initializeRuntime(_0x3fe70f);return _0x2d6fc0['encodeUrl'](_0x3701c8);},async 'reset'(){initializedWisp='',connection=null;},'files':FILES});
+import { BareMuxConnection } from "../BareMux/index.mjs";
+
+const ROOT_URL = new URL("../", import.meta.url);
+const FILES = Object.freeze({
+    serviceWorker: new URL("sw.js", ROOT_URL).href,
+    scramjetAll: new URL("Scramjet/scramjet.all.js", ROOT_URL).href,
+    scramjetWasm: new URL("Scramjet/scramjet.wasm.wasm", ROOT_URL).href,
+    scramjetSync: new URL("Scramjet/scramjet.sync.js", ROOT_URL).href,
+    bareMuxWorker: new URL("BareMux/worker.js", ROOT_URL).href,
+    libcurlTransport: new URL("Transport/index.mjs", ROOT_URL).href,
+});
+
+const OWOB_LOG_STORAGE_KEY = "owo.browser.loginDiagnosticLog";
+const OWOB_LOG_MESSAGE_TYPE = "OWOB_LOGIN_DIAGNOSTIC_LOG";
+
+let controller = null;
+let connection = null;
+let initializedWisp = "";
+let initialization = null;
+let runtimeScriptPromise = null;
+let diagnosticLogState = readDiagnosticLogState();
+
+function normalizeDiagnosticLogState(value) {
+    return String(value || "").trim().toUpperCase() === "ON" ? "ON" : "OFF";
+}
+
+function readDiagnosticLogState() {
+    try {
+        return normalizeDiagnosticLogState(window.localStorage.getItem(OWOB_LOG_STORAGE_KEY) || "OFF");
+    } catch (_) {
+        return "OFF";
+    }
+}
+
+function sendDiagnosticLogState(worker) {
+    const target = worker || navigator.serviceWorker.controller;
+    if (!target) return false;
+
+    target.postMessage({
+        type: OWOB_LOG_MESSAGE_TYPE,
+        value: diagnosticLogState,
+    });
+    return true;
+}
+
+function publishDiagnosticLogState(registration) {
+    sendDiagnosticLogState(registration?.active);
+    sendDiagnosticLogState(registration?.waiting);
+    sendDiagnosticLogState(registration?.installing);
+    sendDiagnosticLogState();
+}
+
+function setDiagnosticLogState(value) {
+    diagnosticLogState = normalizeDiagnosticLogState(value);
+
+    try {
+        window.localStorage.setItem(OWOB_LOG_STORAGE_KEY, diagnosticLogState);
+    } catch (_) {}
+
+    publishDiagnosticLogState();
+    console.info(`[OwOb] Login diagnostic log: ${diagnosticLogState}`);
+    if (diagnosticLogState === "OFF") printDiagnosticErrorTable("切換為計數模式");
+    return diagnosticLogState;
+}
+
+function initializeDiagnosticLogControl() {
+    const api = globalThis.OwOb && typeof globalThis.OwOb === "object"
+        ? globalThis.OwOb
+        : {};
+
+    Object.defineProperty(api, "Log", {
+        configurable: true,
+        enumerable: true,
+        get() {
+            return diagnosticLogState;
+        },
+        set(value) {
+            setDiagnosticLogState(value);
+        },
+    });
+
+    globalThis.OwOb = api;
+
+    const errorsApi = {};
+    Object.defineProperties(errorsApi, {
+        List: { enumerable: true, value: () => { printDiagnosticErrorTable(); return { ...diagnosticErrorCounts }; } },
+        Clear: { enumerable: true, value: () => clearDiagnosticErrors(true) },
+        Counts: { enumerable: true, get: () => ({ ...diagnosticErrorCounts }) },
+    });
+    Object.defineProperty(api, "Errors", { configurable: true, enumerable: true, value: errorsApi });
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+        sendDiagnosticLogState();
+    });
+
+    console.info(`[OwOb] Login diagnostic log: ${diagnosticLogState}`);
+    console.info(
+        `[OwOb] 輸入 OwOb.Log = "${diagnosticLogState === "ON" ? "OFF" : "ON"}" ` +
+        `${diagnosticLogState === "ON" ? "關閉" : "開啟"}登入診斷紀錄`
+    );
+}
+
+function ensureSecureContext() {
+    if (!window.isSecureContext && location.hostname !== "localhost") {
+        throw new Error("Scramjet 需要 HTTPS 或 localhost，無法從 file:// 直接啟動。");
+    }
+    if (!("serviceWorker" in navigator)) {
+        throw new Error("目前瀏覽器不支援 Service Worker。");
+    }
+    if (!("SharedWorker" in window)) {
+        throw new Error("目前瀏覽器不支援 Bare-Mux 所需的 SharedWorker。");
+    }
+}
+
+function validateWisp(value) {
+    const url = new URL(String(value || "").trim());
+    if (!/^wss?:$/.test(url.protocol)) {
+        throw new Error("Wisp 位址必須使用 ws:// 或 wss://。");
+    }
+    if (location.protocol === "https:" && url.protocol !== "wss:") {
+        throw new Error("HTTPS 網站只能使用 wss:// Wisp。");
+    }
+    return url.href;
+}
+
+function loadRuntimeScript() {
+    if (typeof window.$scramjetLoadController === "function") {
+        return Promise.resolve();
+    }
+    if (runtimeScriptPromise) return runtimeScriptPromise;
+
+    runtimeScriptPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-owo-scramjet-runtime="true"]');
+        const script = existing || document.createElement("script");
+
+        const finish = () => {
+            if (typeof window.$scramjetLoadController === "function") {
+                resolve();
+            } else {
+                runtimeScriptPromise = null;
+                reject(new Error("Scramjet Runtime 已下載，但控制器介面未建立。請清除網站快取後重試。"));
+            }
+        };
+
+        const fail = () => {
+            runtimeScriptPromise = null;
+            reject(new Error(`Scramjet Runtime 載入失敗：${FILES.scramjetAll}`));
+        };
+
+        script.addEventListener("load", finish, { once: true });
+        script.addEventListener("error", fail, { once: true });
+
+        if (!existing) {
+            script.src = FILES.scramjetAll;
+            script.async = true;
+            script.dataset.owoScramjetRuntime = "true";
+            document.head.appendChild(script);
+        }
+    });
+
+    return runtimeScriptPromise;
+}
+
+async function ensureScramjetController() {
+    if (controller) return controller;
+
+    await loadRuntimeScript();
+    const loader = window.$scramjetLoadController;
+    if (typeof loader !== "function") {
+        throw new Error("Scramjet Runtime 控制器載入失敗。");
+    }
+
+    const { ScramjetController } = loader();
+    controller = new ScramjetController({
+        prefix: `${ROOT_URL.pathname}scramjet/`,
+        files: {
+            // Scramjet v1 stores these values in IndexedDB and compares them
+            // as same-origin pathnames inside its Service Worker.
+            wasm: new URL(FILES.scramjetWasm).pathname,
+            all: new URL(FILES.scramjetAll).pathname,
+            sync: new URL(FILES.scramjetSync).pathname,
+        },
+    });
+
+    await Promise.resolve(controller.init());
+    return controller;
+}
+
+async function ensureServiceWorker() {
+    const registration = await navigator.serviceWorker.register(FILES.serviceWorker, {
+        scope: ROOT_URL.pathname,
+        updateViaCache: "none",
+    });
+    await navigator.serviceWorker.ready;
+    publishDiagnosticLogState(registration);
+    return registration;
+}
+
+async function ensureTransport(wisp) {
+    if (!connection) {
+        connection = new BareMuxConnection(FILES.bareMuxWorker);
+    }
+    if (initializedWisp !== wisp) {
+        await connection.setTransport(FILES.libcurlTransport, [{ websocket: wisp }]);
+        initializedWisp = wisp;
+    }
+}
+
+async function initializeRuntime(wispValue) {
+    const wisp = validateWisp(wispValue);
+
+    if (!initialization) {
+        initialization = (async () => {
+            ensureSecureContext();
+
+            // Bare-Mux must be ready before Scramjet's Service Worker starts.
+            // Otherwise the worker repeatedly waits for a SharedWorker MessagePort.
+            await ensureTransport(wisp);
+            await ensureScramjetController();
+            await ensureServiceWorker();
+        })().catch((error) => {
+            initialization = null;
+            throw error;
+        });
+    }
+
+    await initialization;
+
+    // Reapply the transport only when the user changes the Wisp URL.
+    await ensureTransport(wisp);
+    return controller;
+}
+
+
+const OWOB_ERROR_CATEGORIES = Object.freeze({
+    bareMuxInitialization: "Bare-Mux 初始化",
+    serviceWorkerRuntime: "Service Worker 執行",
+    transportTls: "Transport／TLS 連線",
+    optionalNetwork: "選用服務網路",
+    mainDocumentNetwork: "主文件網路",
+    requiredApiNetwork: "必要 API 網路",
+    loginSessionChain: "登入 Session 鏈",
+    cookieCsrf: "Cookie／CSRF 配對",
+    arrayCompatibility: "Array 相容性",
+    selectorCompatibility: "Selector 相容性",
+    readonlyArray: "唯讀陣列",
+    iteratorCompatibility: "Iterator 相容性",
+    touchEventCompatibility: "TouchEvent 相容性",
+    urlRewriteCompatibility: "URL 重寫相容性",
+    reactHydrationCompatibility: "React／Hydration 相容性",
+    moduleLoadingCompatibility: "模組載入相容性",
+    scriptLoading: "JavaScript 載入",
+    resourceLoading: "靜態資源載入",
+    widgetValidation: "聊天元件驗證",
+    permissionSecurity: "權限／安全限制",
+    unknown: "未分類錯誤",
+});
+
+const QUIET_TABLE_DELAY_MS = 8000;
+const FIRST_NOTICE_LIMIT = 1;
+let diagnosticErrorCounts = createDiagnosticErrorCounts();
+let diagnosticErrorPageKey = "";
+let diagnosticErrorPrintTimer = null;
+let diagnosticErrorSignatures = new Map();
+let diagnosticErrorsSinceLastSummary = 0;
+
+function createDiagnosticErrorCounts() {
+    return Object.fromEntries(Object.keys(OWOB_ERROR_CATEGORIES).map((key) => [key, 0]));
+}
+
+function normalizeDiagnosticText(value) {
+    return String(value || "")
+        .replace(/https?:\/\/[^\s)]+/gi, "<URL>")
+        .replace(/:\d+:\d+/g, ":#:#")
+        .replace(/\b\d{4,}\b/g, "#")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function classifyDiagnosticError(message, stack) {
+    const text = `${message}\n${stack}`;
+    if (/invalid MessagePort|All clients returned an invalid MessagePort|bare-mux SharedWorker/i.test(text)) return "bareMuxInitialization";
+    if (/ERROR FROM SERVICE WORKER|Service Worker.*(?:failed|error)|Failed to register.*Service Worker/i.test(text)) return "serviceWorkerRuntime";
+    if (/error code 35|SSL connect error|TLS|certificate/i.test(text)) return /improving\.|analytics|telemetry|doubleclick|googletagmanager/i.test(text) ? "optionalNetwork" : "transportTls";
+    if (/improving\.|analytics|telemetry|doubleclick|googletagmanager|webvitals|wide_event/i.test(text)) return "optionalNetwork";
+    if (/login|session-chain|Session Lock|csrfMatches|sessionMatches/i.test(text) && /false|failed|mismatch|error/i.test(text)) return "loginSessionChain";
+    if (/cookie|csrf|xsrf|authenticity/i.test(text) && /false|failed|mismatch|invalid/i.test(text)) return "cookieCsrf";
+    if (/Array\.prototype\.|comparison function|Cannot convert undefined or null to object/i.test(text)) return "arrayCompatibility";
+    if (/querySelector|querySelectorAll|matches.*valid selector|selector is empty/i.test(text)) return "selectorCompatibility";
+    if (/read only property ['"]length|Cannot add property.*not extensible|Array\.push/i.test(text)) return "readonlyArray";
+    if (/Constructor Iterator requires ['"]new|Iterator/i.test(text)) return "iteratorCompatibility";
+    if (/TouchEvent|provided event type.*invalid/i.test(text)) return "touchEventCompatibility";
+    if (/Failed to construct ['"]URL|Invalid URL|URL constructor/i.test(text)) return "urlRewriteCompatibility";
+    if (/Minified React error|hydration|Hydration|ReactDOM/i.test(text)) return "reactHydrationCompatibility";
+    if (/Cannot find module|ChunkLoadError|Loading chunk .* failed|dynamic import/i.test(text)) return "moduleLoadingCompatibility";
+    if (/Failed to load script|script.*(?:failed|error)|SyntaxError.*module/i.test(text)) return "scriptLoading";
+    if (/widget key|CHAT BOX|Unprocessable Content/i.test(text)) return "widgetValidation";
+    if (/SecurityError|NotAllowedError|Permission denied|blocked by/i.test(text)) return "permissionSecurity";
+    if (/Failed to load resource|HTTP [45]\d\d|status of [45]\d\d/i.test(text)) return "resourceLoading";
+    return "unknown";
+}
+
+function diagnosticSignature(category, message, stack) {
+    const firstUsefulFrame = String(stack || "").split("\n").find((line) => /\bat\b|https?:/i.test(line)) || "";
+    return `${category}|${normalizeDiagnosticText(message)}|${normalizeDiagnosticText(firstUsefulFrame)}`;
+}
+
+function printDiagnosticErrorTable(reason = "目前頁面") {
+    console.groupCollapsed(`[OwOb Errors] 統計表｜${reason}`);
+    for (const [key, label] of Object.entries(OWOB_ERROR_CATEGORIES)) {
+        console.info(`${label}：${diagnosticErrorCounts[key]}`);
+    }
+    console.info(`錯誤簽章：${diagnosticErrorSignatures.size}`);
+    console.groupEnd();
+}
+
+function scheduleDiagnosticErrorTable() {
+    if (diagnosticLogState === "ON") return;
+    if (diagnosticErrorPrintTimer) clearTimeout(diagnosticErrorPrintTimer);
+    diagnosticErrorPrintTimer = window.setTimeout(() => {
+        diagnosticErrorPrintTimer = null;
+        if (diagnosticErrorsSinceLastSummary > 0) {
+            printDiagnosticErrorTable("錯誤停止 8 秒後摘要");
+            diagnosticErrorsSinceLastSummary = 0;
+        }
+    }, QUIET_TABLE_DELAY_MS);
+}
+
+function clearDiagnosticErrors(announce = true) {
+    diagnosticErrorCounts = createDiagnosticErrorCounts();
+    diagnosticErrorSignatures = new Map();
+    diagnosticErrorsSinceLastSummary = 0;
+    if (diagnosticErrorPrintTimer) {
+        clearTimeout(diagnosticErrorPrintTimer);
+        diagnosticErrorPrintTimer = null;
+    }
+    if (announce) console.info("[OwOb Errors] 統計表已清除");
+    printDiagnosticErrorTable("新頁面重置");
+    return { ...diagnosticErrorCounts };
+}
+
+function beginDiagnosticPage(url) {
+    const nextKey = String(url || "");
+    if (nextKey === diagnosticErrorPageKey) return;
+    diagnosticErrorPageKey = nextKey;
+    clearDiagnosticErrors(false);
+}
+
+function recordDiagnosticError(message, stack, metadata = {}) {
+    const cleanMessage = String(message || "未知錯誤");
+    const cleanStack = String(stack || "");
+    const category = classifyDiagnosticError(cleanMessage, `${cleanStack}\n${JSON.stringify(metadata)}`);
+    diagnosticErrorCounts[category] += 1;
+    diagnosticErrorsSinceLastSummary += 1;
+    const signature = diagnosticSignature(category, cleanMessage, cleanStack);
+    const occurrence = (diagnosticErrorSignatures.get(signature) || 0) + 1;
+    diagnosticErrorSignatures.set(signature, occurrence);
+
+    if (diagnosticLogState === "ON") {
+        console.warn(`[OwOb Errors] ${OWOB_ERROR_CATEGORIES[category]}｜第 ${occurrence} 次`, cleanMessage, cleanStack, metadata);
+    } else if (occurrence <= FIRST_NOTICE_LIMIT) {
+        console.info(`[OwOb Errors] 新增類別：${OWOB_ERROR_CATEGORIES[category]}｜累計 ${diagnosticErrorCounts[category]} 筆`);
+    }
+    scheduleDiagnosticErrorTable();
+    return category;
+}
+
+window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || data.type !== "OWOB_COMPATIBILITY_ERROR") return;
+    recordDiagnosticError(data.message, data.stack, data.metadata || {});
+});
+
+window.addEventListener("error", (event) => {
+    if (!event.error && !event.message) return;
+    recordDiagnosticError(event.message, event.error?.stack || "", { source: event.filename || "window" });
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason;
+    recordDiagnosticError(reason?.message || reason, reason?.stack || "", { source: "unhandledrejection" });
+});
+
+initializeDiagnosticLogControl();
+
+window.owoScramjetAdapter = Object.freeze({
+    async getUrl({ target, wisp }) {
+        const targetUrl = new URL(target).href;
+        beginDiagnosticPage(targetUrl);
+        const activeController = await initializeRuntime(wisp);
+        return activeController.encodeUrl(targetUrl);
+    },
+
+    async reset() {
+        initializedWisp = "";
+        connection = null;
+    },
+
+    files: FILES,
+});

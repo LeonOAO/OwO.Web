@@ -1,1 +1,509 @@
-'use strict';const KEY='owo.browser.settings.v2.2',cfg=window['OWO_CONFIG']||{},DUCKDUCKGO_HOME='https://duckduckgo.com/',DUCKDUCKGO_SEARCH='https://duckduckgo.com/?q=';let settings=loadSettings(),tabs=[],activeId=null,identitySyncTimers=[];const $=_0xed6398=>document['querySelector'](_0xed6398),el={'tabList':$('#tabList'),'address':$('#address'),'start':$('#start'),'content':$('#content'),'frame':$('#frame'),'notice':$('#notice'),'noticeText':$('#noticeText'),'status':$('#status'),'connection':$('#connection'),'progress':$('#progress'),'dialog':$('#settingsDialog'),'closeSettings':$('#closeSettings'),'settingsForm':$('#settingsForm'),'wisp':$('#wisp'),'preflight':$('#preflight'),'lamp':$('#lamp'),'testTitle':$('#testTitle'),'testDetail':$('#testDetail'),'siteIcon':$('#siteIcon')};function loadSettings(){try{return{'engine':cfg['defaultEngine']==='ultraviolet'?'ultraviolet':'scramjet','wispUrl':cfg['defaultWispUrl']||'','preflightEnabled':cfg['preflightEnabled']!==![],...JSON['parse'](localStorage['getItem'](KEY)||'{}')};}catch{return{'engine':'scramjet','wispUrl':'','preflightEnabled':!![]};}}function saveSettings(){localStorage['setItem'](KEY,JSON['stringify'](settings)),updateConnection();}function updateConnection(){const _0x57a799=settings['engine']==='scramjet'?'Scramjet':'Ultraviolet';el['connection']['textContent']=_0x57a799+'\x20·\x20'+(settings['wispUrl']||'Wisp\x20尚未設定');}function activeTab(){return tabs['find'](_0x38a4bb=>_0x38a4bb['id']===activeId);}function newId(){if(crypto['randomUUID'])return crypto['randomUUID']();return Date['now']()+'-'+Math['random']()['toString'](0x10)['slice'](0x2);}function addTab(){const _0x21fb59=newId();tabs['push']({'id':_0x21fb59,'title':'新分頁','url':'','favicon':'','history':[],'index':-0x1}),activeId=_0x21fb59,renderTabs(),showHome();}function createFaviconElement(_0xc4449e){const _0x2bd700=document['createElement']('span');_0x2bd700['className']='tab-favicon';if(_0xc4449e['favicon']){const _0x1e0942=document['createElement']('img');_0x1e0942['src']=_0xc4449e['favicon'],_0x1e0942['alt']='',_0x1e0942['addEventListener']('error',()=>{_0x2bd700['replaceChildren'](document['createTextNode'](_0xc4449e['url']?'◇':'＋'));},{'once':!![]}),_0x2bd700['append'](_0x1e0942);}else _0x2bd700['textContent']=_0xc4449e['url']?'◇':'＋';return _0x2bd700;}function renderTabs(){el['tabList']['replaceChildren'](...tabs['map'](_0x460ddd=>{const _0x22e7a7=document['createElement']('div');_0x22e7a7['className']='tab\x20'+(_0x460ddd['id']===activeId?'active':''),_0x22e7a7['setAttribute']('role','tab'),_0x22e7a7['setAttribute']('aria-selected',String(_0x460ddd['id']===activeId)),_0x22e7a7['tabIndex']=0x0;const _0x35d1a7=createFaviconElement(_0x460ddd),_0x140315=document['createElement']('span');_0x140315['className']='tab-title',_0x140315['textContent']=_0x460ddd['title'],_0x140315['title']=_0x460ddd['title'];const _0x55d519=document['createElement']('button');return _0x55d519['type']='button',_0x55d519['className']='tab-close',_0x55d519['textContent']='×',_0x55d519['title']='關閉分頁',_0x55d519['setAttribute']('aria-label','關閉\x20'+_0x460ddd['title']),_0x22e7a7['append'](_0x35d1a7,_0x140315,_0x55d519),_0x22e7a7['addEventListener']('click',()=>activateTab(_0x460ddd['id'])),_0x22e7a7['addEventListener']('keydown',_0x24a9ad=>{(_0x24a9ad['key']==='Enter'||_0x24a9ad['key']==='\x20')&&(_0x24a9ad['preventDefault'](),activateTab(_0x460ddd['id']));}),_0x55d519['addEventListener']('click',_0x1bb3e3=>{_0x1bb3e3['stopPropagation'](),closeTab(_0x460ddd['id']);}),_0x22e7a7;}));}async function activateTab(_0x8aa9e8){activeId=_0x8aa9e8,renderTabs();const _0x4034bd=activeTab();if(!_0x4034bd?.['url']){showHome();return;}updateBrowserIdentity(_0x4034bd),await openCurrentTab();}function closeTab(_0x3e5fd7){const _0x66c77e=tabs['findIndex'](_0x3c013c=>_0x3c013c['id']===_0x3e5fd7);tabs=tabs['filter'](_0x203bd0=>_0x203bd0['id']!==_0x3e5fd7);if(!tabs['length']){addTab();return;}activeId===_0x3e5fd7&&(activeId=tabs[Math['max'](0x0,_0x66c77e-0x1)]?.['id']||tabs[0x0]['id']),void activateTab(activeId);}function clearIdentitySyncTimers(){identitySyncTimers['forEach'](_0x42869f=>clearTimeout(_0x42869f)),identitySyncTimers=[];}function showHome(){clearIdentitySyncTimers(),el['start']['hidden']=![],el['content']['hidden']=!![],el['notice']['hidden']=!![],el['address']['value']='',el['frame']['removeAttribute']('src'),el['status']['textContent']='已就緒';if(el['siteIcon'])el['siteIcon']['textContent']='◇';document['title']='OwO\x20Browser';}function looksLikeSearch(_0x48f7b4){if(/\s/['test'](_0x48f7b4))return!![];if(/^[a-zA-Z][a-zA-Z\d+.-]*:/['test'](_0x48f7b4))return![];if(/^localhost(?::\d+)?(?:\/|$)/i['test'](_0x48f7b4))return![];if(/^(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/|$)/['test'](_0x48f7b4))return![];return!_0x48f7b4['includes']('.');}function normalizeTarget(_0x711334){const _0x4b3086=String(_0x711334||'')['trim']();if(!_0x4b3086)throw new Error('請輸入網址或搜尋內容。');const _0x275a9a=looksLikeSearch(_0x4b3086)?''+DUCKDUCKGO_SEARCH+encodeURIComponent(_0x4b3086):/^[a-zA-Z][a-zA-Z\d+.-]*:/['test'](_0x4b3086)?_0x4b3086:'https://'+_0x4b3086,_0x235a7a=new URL(_0x275a9a);if(!/^https?:$/['test'](_0x235a7a['protocol']))throw new Error('網址需使用\x20http://\x20或\x20https://。');return _0x235a7a['href'];}function normalizeWisp(_0x153e94=settings['wispUrl']){const _0x52b3b6=String(_0x153e94||'')['trim']();if(!_0x52b3b6)throw new Error('請先填入\x20Wisp\x20位址。');const _0x125784=new URL(_0x52b3b6);if(!/^wss?:$/['test'](_0x125784['protocol']))throw new Error('Wisp\x20需以\x20ws://\x20或\x20wss://\x20開頭。');if(location['protocol']==='https:'&&_0x125784['protocol']!=='wss:')throw new Error('GitHub\x20Pages\x20使用\x20HTTPS，Wisp\x20請使用\x20wss://。');return _0x125784['href'];}function testSocket(_0x501c0f,_0xed7c14=0x1f40){return new Promise((_0x5c5927,_0xe53282)=>{let _0x134cdb=![];const _0x11c617=new WebSocket(_0x501c0f),_0x34abec=setTimeout(()=>_0x51af49(new Error('連線逾時')),_0xed7c14);function _0x51af49(_0x391b5b){if(_0x134cdb)return;_0x134cdb=!![],clearTimeout(_0x34abec);try{_0x11c617['close']();}catch{}_0x391b5b?_0xe53282(_0x391b5b):_0x5c5927();}_0x11c617['addEventListener']('open',()=>_0x51af49()),_0x11c617['addEventListener']('error',()=>_0x51af49(new Error('WebSocket\x20握手失敗')));});}async function navigate(_0xdbb1c0){try{const _0x2ef985=normalizeTarget(_0xdbb1c0),_0x177893=activeTab();_0x177893['url']=_0x2ef985,_0x177893['title']=new URL(_0x2ef985)['hostname'],_0x177893['favicon']=getFallbackFavicon(_0x2ef985),_0x177893['history']=_0x177893['history']['slice'](0x0,_0x177893['index']+0x1),_0x177893['history']['push'](_0x2ef985),_0x177893['index']=_0x177893['history']['length']-0x1,updateBrowserIdentity(_0x177893),renderTabs(),await openCurrentTab();}catch(_0x3ed917){showNotice(_0x3ed917 instanceof Error?_0x3ed917['message']:String(_0x3ed917));}}async function openCurrentTab(){const _0x16f059=activeTab();if(!_0x16f059?.['url']){showHome();return;}el['progress']['classList']['add']('loading'),el['status']['textContent']='正在建立工作階段';try{const _0x2b90e9=normalizeWisp();if(settings['preflightEnabled'])await testSocket(_0x2b90e9);await showEngineView(_0x16f059['url'],_0x2b90e9);}catch(_0x1d6fe3){showNotice(_0x1d6fe3 instanceof Error?_0x1d6fe3['message']:String(_0x1d6fe3));}finally{el['progress']['classList']['remove']('loading');}}async function showEngineView(_0x5c6149,_0x2d36b1=settings['wispUrl']){el['start']['hidden']=!![],el['content']['hidden']=!![],el['notice']['hidden']=!![];const _0x32e1a2=settings['engine']==='scramjet'?window['owoScramjetAdapter']:window['owoUltravioletAdapter'];if(!_0x32e1a2?.['getUrl']&&!_0x32e1a2?.['launch']){showNotice((settings['engine']==='scramjet'?'Scramjet':'Ultraviolet')+'\x20Runtime\x20Adapter\x20尚未接入。');return;}const _0x32a35a=_0x32e1a2['getUrl']?await _0x32e1a2['getUrl']({'target':_0x5c6149,'wisp':_0x2d36b1}):await _0x32e1a2['launch']({'target':_0x5c6149,'wisp':_0x2d36b1,'frame':el['frame']});typeof _0x32a35a==='string'&&(el['frame']['src']=_0x32a35a,el['content']['hidden']=![]),el['status']['textContent']='已開啟';}function showNotice(_0x441e3b){el['start']['hidden']=!![],el['content']['hidden']=!![],el['notice']['hidden']=![],el['noticeText']['textContent']=_0x441e3b,el['status']['textContent']='執行提示';}function moveHistory(_0xf2b96b){const _0x220096=activeTab(),_0x2f89fa=_0x220096['index']+_0xf2b96b;if(_0x2f89fa<0x0||_0x2f89fa>=_0x220096['history']['length'])return;_0x220096['index']=_0x2f89fa,_0x220096['url']=_0x220096['history'][_0x2f89fa],_0x220096['title']=new URL(_0x220096['url'])['hostname'],_0x220096['favicon']=getFallbackFavicon(_0x220096['url']),updateBrowserIdentity(_0x220096),renderTabs(),void openCurrentTab();}function openSettings(){el['wisp']['value']=settings['wispUrl'],el['preflight']['checked']=settings['preflightEnabled'],document['querySelectorAll']('[name=\x22engine\x22]')['forEach'](_0x334e31=>{_0x334e31['checked']=_0x334e31['value']===settings['engine'];}),el['lamp']['className']='',el['testTitle']['textContent']='尚未檢測',el['testDetail']['textContent']='可先測試\x20Wisp\x20連線。',el['dialog']['showModal']();}function getFallbackFavicon(_0x5bc758){try{return new URL('/favicon.ico',_0x5bc758)['href'];}catch{return'';}}function resolvePageFavicon(_0x5c9527,_0x1d82d0){const _0x2b90ff=_0x5c9527['querySelector'](['link[rel~=\x22icon\x22]','link[rel=\x22shortcut\x20icon\x22]','link[rel=\x22apple-touch-icon\x22]','link[rel=\x22apple-touch-icon-precomposed\x22]']['join'](','));try{const _0x59e5f2=_0x2b90ff?.['getAttribute']('href');return _0x59e5f2?new URL(_0x59e5f2,_0x1d82d0)['href']:getFallbackFavicon(_0x1d82d0);}catch{return getFallbackFavicon(_0x1d82d0);}}function setSiteIcon(_0x19aaed){if(!el['siteIcon'])return;el['siteIcon']['replaceChildren']();if(!_0x19aaed){el['siteIcon']['textContent']='◇';return;}const _0xb3ad0e=document['createElement']('img');_0xb3ad0e['src']=_0x19aaed,_0xb3ad0e['alt']='',_0xb3ad0e['addEventListener']('error',()=>{el['siteIcon']['replaceChildren'](document['createTextNode']('◇'));},{'once':!![]}),el['siteIcon']['append'](_0xb3ad0e);}function updateBrowserIdentity(_0x1b027f){if(!_0x1b027f||_0x1b027f['id']!==activeId)return;el['address']['value']=_0x1b027f['url']||'',setSiteIcon(_0x1b027f['favicon']||''),document['title']=_0x1b027f['url']?_0x1b027f['title']+'\x20-\x20OwO\x20Browser':'OwO\x20Browser';}function readFrameIdentity(){const _0x30e9e8=activeTab();if(!_0x30e9e8?.['url'])return;let _0x16926a=_0x30e9e8['url'],_0x49d543='',_0x71281a='';try{const _0x40c385=el['frame']['contentWindow'],_0x58cace=el['frame']['contentDocument'],_0x7784b6=_0x40c385?.['location']?.['href'];_0x7784b6&&_0x7784b6!=='about:blank'&&(_0x16926a=_0x7784b6),_0x49d543=String(_0x58cace?.['title']||'')['trim'](),_0x71281a=_0x58cace?resolvePageFavicon(_0x58cace,_0x16926a):'';}catch{_0x16926a=_0x30e9e8['url'];}try{const _0x1f409d=new URL(_0x16926a);_0x1f409d['origin']===location['origin']&&_0x30e9e8['url']&&(_0x16926a=_0x30e9e8['url']);}catch{_0x16926a=_0x30e9e8['url'];}_0x30e9e8['url']=_0x16926a,_0x30e9e8['title']=_0x49d543||new URL(_0x30e9e8['url'])['hostname'],_0x30e9e8['favicon']=_0x71281a||getFallbackFavicon(_0x30e9e8['url']),updateBrowserIdentity(_0x30e9e8),renderTabs();}function scheduleFrameIdentitySync(){clearIdentitySyncTimers(),[0x64,0x1f4,0x4b0,0x9c4]['forEach'](_0x8e9e09=>{identitySyncTimers['push'](window['setTimeout'](readFrameIdentity,_0x8e9e09));});}$('#addTab')['addEventListener']('click',addTab),$('#addressForm')['addEventListener']('submit',_0x20382b=>{_0x20382b['preventDefault'](),void navigate(el['address']['value']);}),$('#startForm')['addEventListener']('submit',_0x568afa=>{_0x568afa['preventDefault'](),void navigate($('#startInput')['value']);}),document['querySelectorAll']('[data-url]')['forEach'](_0x4b00fa=>{_0x4b00fa['addEventListener']('click',()=>void navigate(_0x4b00fa['dataset']['url']));}),$('#home')['addEventListener']('click',()=>{const _0x5d3ee7=activeTab();_0x5d3ee7['url']='',_0x5d3ee7['title']='新分頁',_0x5d3ee7['favicon']='',_0x5d3ee7['history']=[],_0x5d3ee7['index']=-0x1,renderTabs(),showHome();}),$('#noticeHome')['addEventListener']('click',()=>$('#home')['click']()),$('#back')['addEventListener']('click',()=>moveHistory(-0x1)),$('#forward')['addEventListener']('click',()=>moveHistory(0x1)),$('#reload')['addEventListener']('click',async()=>{const _0x8dde20=activeTab();if(!_0x8dde20?.['url']){showHome();return;}el['status']['textContent']='正在重新連線',el['progress']['classList']['add']('loading');try{el['frame']['src']='about:blank',await new Promise(_0x41bc0b=>requestAnimationFrame(()=>requestAnimationFrame(_0x41bc0b))),await openCurrentTab();}catch(_0x35099f){showNotice(_0x35099f instanceof Error?_0x35099f['message']:String(_0x35099f));}finally{el['progress']['classList']['remove']('loading');}}),$('#settings')['addEventListener']('click',openSettings),$('#startSettings')['addEventListener']('click',openSettings),$('#star')['addEventListener']('click',()=>{$('#star')['textContent']=$('#star')['textContent']==='☆'?'★':'☆';}),el['closeSettings']['addEventListener']('click',()=>el['dialog']['close']()),el['dialog']['addEventListener']('click',_0x42f5ed=>{if(_0x42f5ed['target']===el['dialog'])el['dialog']['close']();}),el['settingsForm']['addEventListener']('submit',_0x309d51=>{_0x309d51['preventDefault']();try{settings={'engine':$('[name=\x22engine\x22]:checked')?.['value']||'scramjet','wispUrl':normalizeWisp(el['wisp']['value']),'preflightEnabled':el['preflight']['checked']},saveSettings(),el['dialog']['close'](),el['status']['textContent']='設定已儲存';}catch(_0x4c551b){el['lamp']['className']='bad',el['testTitle']['textContent']='設定錯誤',el['testDetail']['textContent']=_0x4c551b instanceof Error?_0x4c551b['message']:String(_0x4c551b);}}),$('#testButton')['addEventListener']('click',async()=>{el['testTitle']['textContent']='正在測試',el['testDetail']['textContent']='建立\x20WebSocket\x20握手...',el['lamp']['className']='';try{await testSocket(normalizeWisp(el['wisp']['value'])),el['lamp']['className']='ok',el['testTitle']['textContent']='連線成功',el['testDetail']['textContent']='Wisp\x20已接受握手。';}catch(_0x1fe928){el['lamp']['className']='bad',el['testTitle']['textContent']='連線失敗',el['testDetail']['textContent']=_0x1fe928 instanceof Error?_0x1fe928['message']:String(_0x1fe928);}}),el['frame']['addEventListener']('load',scheduleFrameIdentitySync),updateConnection(),addTab();
+"use strict";
+
+const KEY = "owo.browser.settings.v2.2";
+const cfg = window.OWO_CONFIG || {};
+const DUCKDUCKGO_HOME = "https://duckduckgo.com/";
+const DUCKDUCKGO_SEARCH = "https://duckduckgo.com/?q=";
+
+let settings = loadSettings();
+let tabs = [];
+let activeId = null;
+let identitySyncTimers = [];
+
+const $ = (selector) => document.querySelector(selector);
+const el = {
+    tabList: $("#tabList"),
+    address: $("#address"),
+    start: $("#start"),
+    content: $("#content"),
+    frame: $("#frame"),
+    notice: $("#notice"),
+    noticeText: $("#noticeText"),
+    status: $("#status"),
+    connection: $("#connection"),
+    progress: $("#progress"),
+    dialog: $("#settingsDialog"),
+    closeSettings: $("#closeSettings"),
+    settingsForm: $("#settingsForm"),
+    wisp: $("#wisp"),
+    preflight: $("#preflight"),
+    lamp: $("#lamp"),
+    testTitle: $("#testTitle"),
+    testDetail: $("#testDetail"),
+    siteIcon: $("#siteIcon"),
+};
+
+function loadSettings() {
+    try {
+        return {
+            engine: cfg.defaultEngine === "ultraviolet" ? "ultraviolet" : "scramjet",
+            wispUrl: cfg.defaultWispUrl || "",
+            preflightEnabled: cfg.preflightEnabled !== false,
+            ...JSON.parse(localStorage.getItem(KEY) || "{}"),
+        };
+    } catch {
+        return { engine: "scramjet", wispUrl: "", preflightEnabled: true };
+    }
+}
+
+function saveSettings() {
+    localStorage.setItem(KEY, JSON.stringify(settings));
+    updateConnection();
+}
+
+function updateConnection() {
+    const engineName = settings.engine === "scramjet" ? "Scramjet" : "Ultraviolet";
+    el.connection.textContent = `${engineName} · ${settings.wispUrl || "Wisp 尚未設定"}`;
+}
+
+function activeTab() {
+    return tabs.find((tab) => tab.id === activeId);
+}
+
+function newId() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function addTab() {
+    const id = newId();
+    tabs.push({
+        id,
+        title: "新分頁",
+        url: "",
+        favicon: "",
+        history: [],
+        index: -1,
+    });
+    activeId = id;
+    renderTabs();
+    showHome();
+}
+
+function createFaviconElement(tabData) {
+    const icon = document.createElement("span");
+    icon.className = "tab-favicon";
+
+    if (tabData.favicon) {
+        const image = document.createElement("img");
+        image.src = tabData.favicon;
+        image.alt = "";
+        image.addEventListener("error", () => {
+            icon.replaceChildren(document.createTextNode(tabData.url ? "◇" : "＋"));
+        }, { once: true });
+        icon.append(image);
+    } else {
+        icon.textContent = tabData.url ? "◇" : "＋";
+    }
+
+    return icon;
+}
+
+function renderTabs() {
+    el.tabList.replaceChildren(...tabs.map((tabData) => {
+        const tab = document.createElement("div");
+        tab.className = `tab ${tabData.id === activeId ? "active" : ""}`;
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-selected", String(tabData.id === activeId));
+        tab.tabIndex = 0;
+
+        const icon = createFaviconElement(tabData);
+        const title = document.createElement("span");
+        title.className = "tab-title";
+        title.textContent = tabData.title;
+        title.title = tabData.title;
+
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "tab-close";
+        close.textContent = "×";
+        close.title = "關閉分頁";
+        close.setAttribute("aria-label", `關閉 ${tabData.title}`);
+
+        tab.append(icon, title, close);
+        tab.addEventListener("click", () => activateTab(tabData.id));
+        tab.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                activateTab(tabData.id);
+            }
+        });
+        close.addEventListener("click", (event) => {
+            event.stopPropagation();
+            closeTab(tabData.id);
+        });
+        return tab;
+    }));
+}
+
+async function activateTab(id) {
+    activeId = id;
+    renderTabs();
+    const tab = activeTab();
+    if (!tab?.url) {
+        showHome();
+        return;
+    }
+    updateBrowserIdentity(tab);
+    await openCurrentTab();
+}
+
+function closeTab(id) {
+    const index = tabs.findIndex((tab) => tab.id === id);
+    tabs = tabs.filter((tab) => tab.id !== id);
+    if (!tabs.length) {
+        addTab();
+        return;
+    }
+    if (activeId === id) {
+        activeId = tabs[Math.max(0, index - 1)]?.id || tabs[0].id;
+    }
+    void activateTab(activeId);
+}
+
+function clearIdentitySyncTimers() {
+    identitySyncTimers.forEach((timer) => clearTimeout(timer));
+    identitySyncTimers = [];
+}
+
+function showHome() {
+    clearIdentitySyncTimers();
+    el.start.hidden = false;
+    el.content.hidden = true;
+    el.notice.hidden = true;
+    el.address.value = "";
+    el.frame.removeAttribute("src");
+    el.status.textContent = "已就緒";
+    if (el.siteIcon) el.siteIcon.textContent = "◇";
+    document.title = "OwO Browser";
+}
+
+function looksLikeSearch(text) {
+    if (/\s/.test(text)) return true;
+    if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(text)) return false;
+    if (/^localhost(?::\d+)?(?:\/|$)/i.test(text)) return false;
+    if (/^(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/|$)/.test(text)) return false;
+    return !text.includes(".");
+}
+
+function normalizeTarget(value) {
+    const text = String(value || "").trim();
+    if (!text) throw new Error("請輸入網址或搜尋內容。");
+
+    const candidate = looksLikeSearch(text)
+        ? `${DUCKDUCKGO_SEARCH}${encodeURIComponent(text)}`
+        : (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(text) ? text : `https://${text}`);
+
+    const url = new URL(candidate);
+    if (!/^https?:$/.test(url.protocol)) {
+        throw new Error("網址需使用 http:// 或 https://。");
+    }
+    return url.href;
+}
+
+function normalizeWisp(value = settings.wispUrl) {
+    const text = String(value || "").trim();
+    if (!text) throw new Error("請先填入 Wisp 位址。");
+    const url = new URL(text);
+    if (!/^wss?:$/.test(url.protocol)) {
+        throw new Error("Wisp 需以 ws:// 或 wss:// 開頭。");
+    }
+    if (location.protocol === "https:" && url.protocol !== "wss:") {
+        throw new Error("GitHub Pages 使用 HTTPS，Wisp 請使用 wss://。");
+    }
+    return url.href;
+}
+
+function testSocket(url, timeout = 8000) {
+    return new Promise((resolve, reject) => {
+        let finished = false;
+        const socket = new WebSocket(url);
+        const timer = setTimeout(() => finish(new Error("連線逾時")), timeout);
+
+        function finish(error) {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            try { socket.close(); } catch {}
+            error ? reject(error) : resolve();
+        }
+
+        socket.addEventListener("open", () => finish());
+        socket.addEventListener("error", () => finish(new Error("WebSocket 握手失敗")));
+    });
+}
+
+async function navigate(value) {
+    try {
+        const url = normalizeTarget(value);
+        const tab = activeTab();
+        tab.url = url;
+        tab.title = new URL(url).hostname;
+        tab.favicon = "";
+        tab.history = tab.history.slice(0, tab.index + 1);
+        tab.history.push(url);
+        tab.index = tab.history.length - 1;
+        updateBrowserIdentity(tab);
+        renderTabs();
+        await openCurrentTab();
+    } catch (error) {
+        showNotice(error instanceof Error ? error.message : String(error));
+    }
+}
+
+async function openCurrentTab() {
+    const tab = activeTab();
+    if (!tab?.url) {
+        showHome();
+        return;
+    }
+
+    el.progress.classList.add("loading");
+    el.status.textContent = "正在建立工作階段";
+
+    try {
+        const wisp = normalizeWisp();
+        if (settings.preflightEnabled) await testSocket(wisp);
+        await showEngineView(tab.url, wisp);
+    } catch (error) {
+        showNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+        el.progress.classList.remove("loading");
+    }
+}
+
+async function showEngineView(target, wisp = settings.wispUrl) {
+    el.start.hidden = true;
+    el.content.hidden = true;
+    el.notice.hidden = true;
+
+    const adapter = settings.engine === "scramjet"
+        ? window.owoScramjetAdapter
+        : window.owoUltravioletAdapter;
+
+    if (!adapter?.getUrl && !adapter?.launch) {
+        showNotice(`${settings.engine === "scramjet" ? "Scramjet" : "Ultraviolet"} Runtime Adapter 尚未接入。`);
+        return;
+    }
+
+    const result = adapter.getUrl
+        ? await adapter.getUrl({ target, wisp })
+        : await adapter.launch({ target, wisp, frame: el.frame });
+
+    if (typeof result === "string") {
+        el.frame.src = result;
+        el.content.hidden = false;
+    }
+    el.status.textContent = "已開啟";
+}
+
+function showNotice(message) {
+    el.start.hidden = true;
+    el.content.hidden = true;
+    el.notice.hidden = false;
+    el.noticeText.textContent = message;
+    el.status.textContent = "執行提示";
+}
+
+function moveHistory(delta) {
+    const tab = activeTab();
+    const next = tab.index + delta;
+    if (next < 0 || next >= tab.history.length) return;
+    tab.index = next;
+    tab.url = tab.history[next];
+    tab.title = new URL(tab.url).hostname;
+    tab.favicon = "";
+    updateBrowserIdentity(tab);
+    renderTabs();
+    void openCurrentTab();
+}
+
+function openSettings() {
+    el.wisp.value = settings.wispUrl;
+    el.preflight.checked = settings.preflightEnabled;
+    document.querySelectorAll('[name="engine"]').forEach((radio) => {
+        radio.checked = radio.value === settings.engine;
+    });
+    el.lamp.className = "";
+    el.testTitle.textContent = "尚未檢測";
+    el.testDetail.textContent = "可先測試 Wisp 連線。";
+    el.dialog.showModal();
+}
+
+function resolvePageFavicon(doc, pageUrl) {
+    const iconLink = doc.querySelector([
+        'link[rel~="icon"]',
+        'link[rel="shortcut icon"]',
+        'link[rel="apple-touch-icon"]',
+        'link[rel="apple-touch-icon-precomposed"]',
+    ].join(","));
+
+    try {
+        const href = iconLink?.getAttribute("href");
+        return href ? new URL(href, pageUrl).href : "";
+    } catch {
+        return "";
+    }
+}
+
+function setSiteIcon(favicon) {
+    if (!el.siteIcon) return;
+    el.siteIcon.replaceChildren();
+    if (!favicon) {
+        el.siteIcon.textContent = "◇";
+        return;
+    }
+
+    const image = document.createElement("img");
+    image.src = favicon;
+    image.alt = "";
+    image.addEventListener("error", () => {
+        el.siteIcon.replaceChildren(document.createTextNode("◇"));
+    }, { once: true });
+    el.siteIcon.append(image);
+}
+
+function updateBrowserIdentity(tab) {
+    if (!tab || tab.id !== activeId) return;
+    el.address.value = tab.url || "";
+    setSiteIcon(tab.favicon || "");
+    document.title = tab.url ? `${tab.title} - OwO Browser` : "OwO Browser";
+}
+
+function readFrameIdentity() {
+    const tab = activeTab();
+    if (!tab?.url) return;
+
+    let pageUrl = tab.url;
+    let pageTitle = "";
+    let favicon = "";
+
+    try {
+        const frameWindow = el.frame.contentWindow;
+        const frameDocument = el.frame.contentDocument;
+        const frameUrl = frameWindow?.location?.href;
+
+        if (frameUrl && frameUrl !== "about:blank") {
+            pageUrl = frameUrl;
+        }
+        pageTitle = String(frameDocument?.title || "").trim();
+        favicon = frameDocument ? resolvePageFavicon(frameDocument, pageUrl) : "";
+    } catch {
+        pageUrl = tab.url;
+    }
+
+    try {
+        const parsed = new URL(pageUrl);
+        if (parsed.origin === location.origin && tab.url) {
+            pageUrl = tab.url;
+        }
+    } catch {
+        pageUrl = tab.url;
+    }
+
+    tab.url = pageUrl;
+    tab.title = pageTitle || new URL(tab.url).hostname;
+    tab.favicon = favicon;
+    updateBrowserIdentity(tab);
+    renderTabs();
+}
+
+function scheduleFrameIdentitySync() {
+    clearIdentitySyncTimers();
+    [100, 500, 1200, 2500].forEach((delay) => {
+        identitySyncTimers.push(window.setTimeout(readFrameIdentity, delay));
+    });
+}
+
+$("#addTab").addEventListener("click", addTab);
+$("#addressForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    void navigate(el.address.value);
+});
+$("#startForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    void navigate($("#startInput").value);
+});
+document.querySelectorAll("[data-url]").forEach((button) => {
+    button.addEventListener("click", () => void navigate(button.dataset.url));
+});
+$("#home").addEventListener("click", () => {
+    const tab = activeTab();
+    tab.url = "";
+    tab.title = "新分頁";
+    tab.favicon = "";
+    tab.history = [];
+    tab.index = -1;
+    renderTabs();
+    showHome();
+});
+$("#noticeHome").addEventListener("click", () => $("#home").click());
+$("#back").addEventListener("click", () => moveHistory(-1));
+$("#forward").addEventListener("click", () => moveHistory(1));
+$("#reload").addEventListener("click", async () => {
+    const tab = activeTab();
+    if (!tab?.url) {
+        showHome();
+        return;
+    }
+
+    el.status.textContent = "正在重新連線";
+    el.progress.classList.add("loading");
+
+    try {
+        el.frame.src = "about:blank";
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await openCurrentTab();
+    } catch (error) {
+        showNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+        el.progress.classList.remove("loading");
+    }
+});
+$("#settings").addEventListener("click", openSettings);
+$("#startSettings").addEventListener("click", openSettings);
+$("#star").addEventListener("click", () => {
+    $("#star").textContent = $("#star").textContent === "☆" ? "★" : "☆";
+});
+
+el.closeSettings.addEventListener("click", () => el.dialog.close());
+el.dialog.addEventListener("click", (event) => {
+    if (event.target === el.dialog) el.dialog.close();
+});
+el.settingsForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+        settings = {
+            engine: $('[name="engine"]:checked')?.value || "scramjet",
+            wispUrl: normalizeWisp(el.wisp.value),
+            preflightEnabled: el.preflight.checked,
+        };
+        saveSettings();
+        el.dialog.close();
+        el.status.textContent = "設定已儲存";
+    } catch (error) {
+        el.lamp.className = "bad";
+        el.testTitle.textContent = "設定錯誤";
+        el.testDetail.textContent = error instanceof Error ? error.message : String(error);
+    }
+});
+$("#testButton").addEventListener("click", async () => {
+    el.testTitle.textContent = "正在測試";
+    el.testDetail.textContent = "建立 WebSocket 握手...";
+    el.lamp.className = "";
+    try {
+        await testSocket(normalizeWisp(el.wisp.value));
+        el.lamp.className = "ok";
+        el.testTitle.textContent = "連線成功";
+        el.testDetail.textContent = "Wisp 已接受握手。";
+    } catch (error) {
+        el.lamp.className = "bad";
+        el.testTitle.textContent = "連線失敗";
+        el.testDetail.textContent = error instanceof Error ? error.message : String(error);
+    }
+});
+
+el.frame.addEventListener("load", scheduleFrameIdentitySync);
+
+updateConnection();
+addTab();
