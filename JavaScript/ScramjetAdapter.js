@@ -360,10 +360,24 @@ function beginDiagnosticPage(url) {
     clearDiagnosticErrors(false);
 }
 
+function sanitizeDiagnosticText(value) {
+    return String(value || "")
+        .replace(/data:application\/javascript;base64,[A-Za-z0-9+/=]+/gi, "data:application/javascript;base64,[redacted]")
+        .replace(/([?&](?:token|key|session|sid|auth|code|state|cookie|credential)=)[^&\s]*/gi, "$1[redacted]")
+        .replace(/(Cookie\s*[:=]\s*)[^\n]*/gi, "$1[redacted]")
+        .replace(/VM\d+/g, "VM")
+        .replace(/:\d+:\d+/g, ":line:column");
+}
+
 function recordDiagnosticError(message, stack, metadata = {}) {
-    const cleanMessage = String(message || "未知錯誤");
-    const cleanStack = String(stack || "");
-    const diagnosticText = `${cleanMessage}\n${cleanStack}\n${JSON.stringify(metadata)}`;
+    // Compatibility telemetry is opt-in. When OFF it emits no classifications,
+    // summaries or copies of rewritten URLs and cannot influence page behavior.
+    if (diagnosticLogState !== "ON") return null;
+
+    const cleanMessage = sanitizeDiagnosticText(message || "未知錯誤");
+    const cleanStack = sanitizeDiagnosticText(stack || "");
+    const safeMetadata = sanitizeDiagnosticText(JSON.stringify(metadata));
+    const diagnosticText = `${cleanMessage}\n${cleanStack}\n${safeMetadata}`;
 
     // Runtime startup and rewrite advisory messages are informational. They do
     // not represent page compatibility failures and must not enter statistics.
@@ -386,7 +400,7 @@ function recordDiagnosticError(message, stack, metadata = {}) {
     diagnosticErrorsSinceLastSummary += 1;
 
     if (diagnosticLogState === "ON") {
-        console.warn(`[OwOb Errors] ${OWOB_ERROR_CATEGORIES[category]}｜第 ${occurrence} 次`, cleanMessage, cleanStack, metadata);
+        console.warn(`[OwOb Errors] ${OWOB_ERROR_CATEGORIES[category]}｜第 ${occurrence} 次`, cleanMessage, cleanStack, safeMetadata);
     } else if (occurrence <= FIRST_NOTICE_LIMIT) {
         console.info(`[OwOb Errors] 新增類別：${OWOB_ERROR_CATEGORIES[category]}｜累計 ${diagnosticErrorCounts[category]} 筆`);
     }
