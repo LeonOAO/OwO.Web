@@ -234,6 +234,16 @@ function isGeneratedChallengeScript(request, target) {
     return challengeResourceKind(request, target) === "javascript";
 }
 
+function isRawMissingChallengeScriptRequest(request) {
+    if (String(request.method || "").toUpperCase() !== "GET") return false;
+
+    const rawUrl = String(request.url || "");
+    const decodedUrl = decodeProxyTarget(rawUrl);
+    return [rawUrl, decodedUrl].some((value) =>
+        /(?:%2f|\/)cdn-cgi(?:%2f|\/)challenge-platform(?:%2f|\/)scripts(?:%2f|\/)jsd(?:%2f|\/)main\.js(?:[?#]|$)/i.test(value)
+    );
+}
+
 async function handleScramjetRequest(event) {
     const request = event.request;
     const target = originalTarget(request.url);
@@ -313,6 +323,13 @@ function quietDirectFetchFailure(request) {
 self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
         try {
+            // This exact generated JSD URL is known to return 404 after rewrite.
+            // Handle it before config loading and routing because dynamically
+            // injected PendingScript requests may expose an empty destination.
+            if (isRawMissingChallengeScriptRequest(event.request)) {
+                return emptyJavaScriptResponse();
+            }
+
             await scramjet.loadConfig();
             if (scramjet.route(event)) {
                 return await handleScramjetRequest(event);
