@@ -281,7 +281,8 @@ function classifyDiagnosticError(message, stack) {
     const text = `${message}\n${stack}`;
     const isScramjetNetworkFailure =
         /Request failed with error code|SSL connect error|ERROR FROM SERVICE WORKER FETCH/i.test(text) ||
-        (/scramjet\.all\.js|Transport\/index\.mjs/i.test(text) && /fetch|network|request|HTTP 5\d\d/i.test(text));
+        (/scramjet\.all\.js|Transport\/index\.mjs/i.test(text) && /fetch|network|request|HTTP 5\d\d|ERR_ABORTED/i.test(text)) ||
+        (/net::ERR_ABORTED|Internal Server Error/i.test(text) && /scramjet|\/scramjet\//i.test(text));
 
     // Network stacks frequently contain framework, module and URL-rewrite frames.
     // Classify the transport cause before any framework compatibility heuristic.
@@ -317,6 +318,8 @@ function diagnosticSignature(category, message, stack) {
 }
 
 function printDiagnosticErrorTable(reason = "目前頁面") {
+    if (diagnosticErrorSignatures.size === 0) return;
+    if (!Object.values(diagnosticErrorCounts).some((count) => count > 0)) return;
     console.groupCollapsed(`[OwOb Errors] 統計表｜${reason}`);
     for (const [key, label] of Object.entries(OWOB_ERROR_CATEGORIES)) {
         console.info(`${label}：${diagnosticErrorCounts[key]}`);
