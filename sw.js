@@ -234,6 +234,48 @@ function isGeneratedChallengeScript(request, target) {
     return challengeResourceKind(request, target) === "javascript";
 }
 
+function optionalUiModuleKind(request, target) {
+    if (String(request.method || "").toUpperCase() !== "GET") return "";
+
+    const host = String(target?.hostname || "").toLowerCase();
+    const path = String(target?.pathname || "");
+
+    // Current Cyberbiz chat-box bootstrap. Stopping the optional bootstrap is
+    // safer than changing its verification API responses after initialization.
+    if (
+        host === "cdn.cybassets.com" &&
+        /\/appmarket\/api\/common\/attachments\/entrypoint\/8766542902afa60f4adda3c555c06025d2c27771ea85a6fc657a91cddbe5c59f\.js$/i.test(path)
+    ) {
+        return "javascript";
+    }
+
+    // Fallback for the chat module if a page already contains its direct asset.
+    if (host === "message-widget.cyberbiz.io" && /\/assets\/index-[^/]+\.js$/i.test(path)) {
+        return "javascript";
+    }
+
+    // Optional customer-chat and analytics scripts known to fail in Transport.
+    if (host === "connect.facebook.net" && /\/sdk\/xfbml\.customerchat\.js$/i.test(path)) {
+        return "javascript";
+    }
+    if (host === "www.clarity.ms" && /^\/tag\//i.test(path)) {
+        return "javascript";
+    }
+
+    return "";
+}
+
+function emptyOptionalUiModuleResponse() {
+    return new Response("", {
+        status: 200,
+        headers: {
+            "Content-Type": "application/javascript; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-OwO-Optional-Ui-Disabled": "1",
+        },
+    });
+}
+
 function isRawMissingChallengeScriptRequest(request) {
     if (String(request.method || "").toUpperCase() !== "GET") return false;
 
@@ -260,6 +302,22 @@ async function handleScramjetRequest(event) {
     const target = originalTarget(request.url);
     const backgroundScript = isOptionalBackgroundScript(request, target);
     const background = isExplicitBackgroundRequest(request, target);
+    const optionalUiModule = optionalUiModuleKind(request, target);
+
+    if (optionalUiModule === "javascript") {
+        event.waitUntil(publishServiceDiagnostic(
+            `Optional UI module disabled: ${target?.hostname || "third-party"}`,
+            {
+                service: target?.hostname || "third-party",
+                targetPath: target?.pathname || "",
+                status: 200,
+                method: request.method,
+                destination: request.destination || "script",
+                disabled: true,
+            }
+        ));
+        return emptyOptionalUiModuleResponse();
+    }
 
     if (isGeneratedChallengeScript(request, target)) return emptyJavaScriptResponse();
 
