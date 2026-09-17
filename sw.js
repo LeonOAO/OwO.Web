@@ -261,12 +261,42 @@ async function handleScramjetRequest(event) {
     }
 }
 
+function quietDirectFetchFailure(request) {
+    if (request.destination === "image") return transparentPixelResponse();
+    if (request.destination === "script") return emptyJavaScriptResponse();
+    return new Response("", {
+        status: 503,
+        statusText: "Service Unavailable",
+        headers: {
+            "Cache-Control": "no-store",
+            "X-OwO-Direct-Fetch-Degraded": "1",
+        },
+    });
+}
+
 self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
-        await scramjet.loadConfig();
-        if (scramjet.route(event)) {
-            return handleScramjetRequest(event);
+        try {
+            await scramjet.loadConfig();
+            if (scramjet.route(event)) {
+                return await handleScramjetRequest(event);
+            }
+            try {
+                return await fetch(event.request);
+            } catch (_) {
+                return quietDirectFetchFailure(event.request);
+            }
+        } catch (error) {
+            // Authentication and navigation failures retain an explicit HTTP
+            // result, while optional resource failures use type-correct output.
+            if (event.request.mode === "navigate" || event.request.destination === "document") {
+                return new Response("Proxy request failed", {
+                    status: 502,
+                    statusText: "Bad Gateway",
+                    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+                });
+            }
+            return quietDirectFetchFailure(event.request);
         }
-        return fetch(event.request);
     })());
 });
