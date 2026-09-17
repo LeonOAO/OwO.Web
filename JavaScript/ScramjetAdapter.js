@@ -237,6 +237,11 @@ const OWOB_ERROR_CATEGORIES = Object.freeze({
     serviceWorkerRuntime: "Service Worker 執行",
     transportTls: "Transport／TLS 連線",
     optionalNetwork: "選用服務網路",
+    thirdPartyChatScript: "第三方聊天腳本",
+    chatWidgetValidation: "聊天元件驗證",
+    analyticsTls: "分析服務／TLS",
+    formAttributeWarning: "表單屬性提醒",
+    runtimeInformation: "Scramjet Runtime 資訊",
     mainDocumentNetwork: "主文件網路",
     requiredApiNetwork: "必要 API 網路",
     loginSessionChain: "登入 Session 鏈",
@@ -251,7 +256,6 @@ const OWOB_ERROR_CATEGORIES = Object.freeze({
     moduleLoadingCompatibility: "模組載入相容性",
     scriptLoading: "JavaScript 載入",
     resourceLoading: "靜態資源載入",
-    widgetValidation: "聊天元件驗證",
     permissionSecurity: "權限／安全限制",
     unknown: "未分類錯誤",
 });
@@ -284,6 +288,13 @@ function classifyDiagnosticError(message, stack) {
         (/scramjet\.all\.js|Transport\/index\.mjs/i.test(text) && /fetch|network|request|HTTP 5\d\d|ERR_ABORTED/i.test(text)) ||
         (/net::ERR_ABORTED|Internal Server Error/i.test(text) && /scramjet|\/scramjet\//i.test(text));
 
+    // Third-party optional services are classified before generic network rules.
+    if (/connect\.facebook\.net|xfbml\.customerchat\.js|customer\s*chat/i.test(text) && /500|failed|ERR_ABORTED|error/i.test(text)) return "thirdPartyChatScript";
+    if (/message\.cyberbiz\.io|CHAT BOX|widget key|\/api\/widgets\/[^/]+\/verify/i.test(text) && /422|invalid|disabled|failed|Unprocessable/i.test(text)) return "chatWidgetValidation";
+    if (/clarity\.ms|Microsoft Clarity/i.test(text) && /error code 60|SSL|TLS|certificate|500|ERR_ABORTED|failed/i.test(text)) return "analyticsTls";
+    if (/Input elements should have autocomplete attributes|current-password/i.test(text)) return "formAttributeWarning";
+    if (/bare-mux:|initializing scramjet client|Creating SingletonBox|last version of scramjet v1/i.test(text)) return "runtimeInformation";
+
     // Network stacks frequently contain framework, module and URL-rewrite frames.
     // Classify the transport cause before any framework compatibility heuristic.
     if (isScramjetNetworkFailure) {
@@ -306,7 +317,7 @@ function classifyDiagnosticError(message, stack) {
     if (/Minified React error|hydration|Hydration|ReactDOM/i.test(text)) return "reactHydrationCompatibility";
     if (/Cannot find module|ChunkLoadError|Loading chunk .* failed|dynamic import/i.test(text)) return "moduleLoadingCompatibility";
     if (/Failed to load script|script.*(?:failed|error)|SyntaxError.*module/i.test(text)) return "scriptLoading";
-    if (/widget key|CHAT BOX|Unprocessable Content/i.test(text)) return "widgetValidation";
+    if (/widget key|CHAT BOX|Unprocessable Content/i.test(text)) return "chatWidgetValidation";
     if (/SecurityError|NotAllowedError|Permission denied|blocked by/i.test(text)) return "permissionSecurity";
     if (/Failed to load resource|HTTP [45]\d\d|status of [45]\d\d/i.test(text)) return "resourceLoading";
     return "unknown";
@@ -381,7 +392,7 @@ function recordDiagnosticError(message, stack, metadata = {}) {
 
     // Runtime startup and rewrite advisory messages are informational. They do
     // not represent page compatibility failures and must not enter statistics.
-    if (/bare-mux:|initializing scramjet client|Creating SingletonBox|last version of scramjet v1|extraneous query parameter|Assuming <form> element/i.test(diagnosticText) &&
+    if (/extraneous query parameter|Assuming <form> element/i.test(diagnosticText) &&
         !/Request failed|SSL connect error|Internal Server Error|net::ERR_|Session lock is unavailable/i.test(diagnosticText)) {
         return null;
     }
@@ -412,6 +423,12 @@ window.addEventListener("message", (event) => {
     const data = event.data;
     if (!data || data.type !== "OWOB_COMPATIBILITY_ERROR") return;
     recordDiagnosticError(data.message, data.stack, data.metadata || {});
+});
+
+navigator.serviceWorker.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || data.type !== "OWOB_SERVICE_DIAGNOSTIC") return;
+    recordDiagnosticError(data.message, data.stack || "", data.metadata || {});
 });
 
 window.addEventListener("error", (event) => {
