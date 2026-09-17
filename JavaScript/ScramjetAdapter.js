@@ -279,6 +279,17 @@ function normalizeDiagnosticText(value) {
 
 function classifyDiagnosticError(message, stack) {
     const text = `${message}\n${stack}`;
+    const isScramjetNetworkFailure =
+        /Request failed with error code|SSL connect error|ERROR FROM SERVICE WORKER FETCH/i.test(text) ||
+        (/scramjet\.all\.js|Transport\/index\.mjs/i.test(text) && /fetch|network|request|HTTP 5\d\d/i.test(text));
+
+    // Network stacks frequently contain framework, module and URL-rewrite frames.
+    // Classify the transport cause before any framework compatibility heuristic.
+    if (isScramjetNetworkFailure) {
+        return /analytics|telemetry|beacon|metrics|performance|pageview|impression|exposure|conversion|diagnostic|heartbeat|event/i.test(text)
+            ? "optionalNetwork"
+            : "transportTls";
+    }
     if (/invalid MessagePort|All clients returned an invalid MessagePort|bare-mux SharedWorker/i.test(text)) return "bareMuxInitialization";
     if (/ERROR FROM SERVICE WORKER|Service Worker.*(?:failed|error)|Failed to register.*Service Worker/i.test(text)) return "serviceWorkerRuntime";
     if (/error code 35|SSL connect error|TLS|certificate/i.test(text)) return /improving\.|analytics|telemetry|doubleclick|googletagmanager/i.test(text) ? "optionalNetwork" : "transportTls";
