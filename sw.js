@@ -84,49 +84,70 @@ function requestDescription(request, target) {
 function isStructurallyProtectedRequest(request, target) {
     if (!target) return true;
     if (request.mode === "navigate") return true;
-    if (CORE_DESTINATIONS.has(request.destination)) return true;
-    return request.method === "GET" || request.method === "HEAD";
+    if (request.destination === "document" || request.destination === "iframe") return true;
+    return false;
+}
+
+function requestStructure(request, target) {
+    const path = String(target?.pathname || "").toLowerCase();
+    const queryNames = new Set();
+    const queryText = [];
+    for (const [name, value] of target?.searchParams || []) {
+        queryNames.add(String(name).toLowerCase());
+        queryText.push(`${String(name).toLowerCase()}=${String(value).toLowerCase()}`);
+    }
+    return {
+        path,
+        queryNames,
+        queryText: queryText.join("&"),
+        contentType: (request.headers.get("content-type") || "").toLowerCase(),
+        accept: (request.headers.get("accept") || "").toLowerCase(),
+    };
+}
+
+function isProtectedAuthenticationRequest(request, target) {
+    if (isStructurallyProtectedRequest(request, target)) return true;
+    const { path, contentType } = requestStructure(request, target);
+    const pathHasState = containsAny(path, LOGIN_AND_STATE_TERMS);
+    const formPost = request.method === "POST" &&
+        /application\/x-www-form-urlencoded|multipart\/form-data/i.test(contentType);
+    const hasAuthHeader = request.headers.has("authorization") ||
+        request.headers.has("x-csrf-token") || request.headers.has("x-xsrf-token");
+    return hasAuthHeader || (pathHasState && formPost);
 }
 
 function isExplicitBackgroundRequest(request, target) {
-    if (isStructurallyProtectedRequest(request, target)) return false;
-    if (request.destination !== "") return false;
+    if (!target || isProtectedAuthenticationRequest(request, target)) return false;
+    const { path, queryNames, queryText, contentType, accept } = requestStructure(request, target);
+    const endpointText = `${path} ${contentType} ${accept}`;
 
-    const description = requestDescription(request, target);
+    const collectionEndpoint = /(?:^|\/)(?:g\/collect|collect|beacon|telemetry|metrics|analytics|conversion|viewthroughconversion|tag\.gif)(?:\/|$)/i.test(path);
+    const eventEndpoint = /\/(?:t|e)\/(?:ias|iaoi|page|event)[_-]/i.test(path);
+    const eventName = ["en", "event", "event_name", "type"].some((name) => queryNames.has(name)) &&
+        /(?:^|&)(?:en|event|event_name|type)=(?:page_view|scroll|user_engagement|form_start|form_submit|impression|conversion)(?:&|$)/i.test(queryText);
+    const measurementParam = ["epn.percent_scrolled", "tfd", "tid", "gtm", "experiment", "time_since_page_load", "initial_state", "tab_position"].some((name) => queryNames.has(name));
+    const strongEndpoint = containsAny(endpointText, STRONG_BACKGROUND_TERMS);
 
-    // Login, session and credential semantics always win over every background signal.
-    if (containsAny(description, LOGIN_AND_STATE_TERMS)) return false;
+    if (collectionEndpoint || eventEndpoint) return true;
+    if (eventName && measurementParam) return true;
+    if (strongEndpoint && (request.destination === "" || request.destination === "image")) return true;
 
-    // Multiple independent measurement signals identify event-only POSTs even
-    // when an event name contains words such as "submit". Navigations and login
-    // flows were already excluded by structural and state checks above.
-    const measurementSignals = [
-        /(?:^|[?&_/.-])experiment(?:[?&_/.-]|$)/i,
-        /(?:^|[?&_/.-])timeSince[A-Z_]/,
-        /(?:^|[?&_/.-])initialState(?:[?&_=.-]|$)/i,
-        /(?:^|[?&_/.-])tabPosition(?:[?&_=.-]|$)/i,
-        /(?:^|[?&_/.-])page[_-]?(?:view|home)(?:[?&_/.-]|$)/i,
-        /(?:^|[?&_/.-])percent[_-]?scrolled(?:[?&_/.-]|$)/i,
-        /\/(?:t|e)\/(?:ias|iaoi|page|event)[_-]/i,
-    ].reduce((count, pattern) => count + Number(pattern.test(description)), 0);
-
-    if (measurementSignals >= 2) return true;
-
-    // High-risk state changes retain their original behavior unless a request
-    // has already met the stronger multi-signal measurement rule above.
-    if (containsAny(description, HIGH_RISK_ACTION_TERMS)) return false;
-
-    // Strong background semantics win over low-risk words such as "download" when
-    // the complete phrase describes an impression or measurement event.
-    if (containsAny(description, STRONG_BACKGROUND_TERMS)) return true;
-
-    // A real download-like endpoint remains protected when no background semantics exist.
-    if (containsAny(description, LOW_RISK_ACTION_TERMS)) return false;
-
-    // sendBeacon and fetch keepalive provide a browser-level background signal.
-    // A short endpoint is accepted only with this signal, never from its path alone.
-    const shortEndpoint = /^\/(?:e|t|b|c|s|v|p)(?:\/|$)/i.test(target.pathname);
+    const shortEndpoint = /^\/(?:e|t|b|c|s|v|p)(?:\/|$)/i.test(path);
     return request.keepalive === true && shortEndpoint;
+}
+
+function transparentPixelResponse() {
+    const bytes = Uint8Array.from([71,73,70,56,57,97,1,0,1,0,128,0,0,0,0,0,255,255,255,33,249,4,1,0,0,0,0,44,0,0,0,0,1,0,1,0,0,2,2,68,1,0,59]);
+    return new Response(bytes, { status: 200, headers: {
+        "Content-Type": "image/gif",
+        "Cache-Control": "no-store",
+        "X-OwO-Background-Degraded": "pixel",
+    }});
+}
+
+function backgroundResponseFor(request) {
+    if (request.destination === "image") return transparentPixelResponse();
+    return backgroundSuccessResponse();
 }
 
 function isOptionalBackgroundScript(request, target) {
@@ -184,11 +205,21 @@ async function handleScramjetRequest(event) {
     // failed TLS handshake cannot create repeated Runtime and HTTP 500 messages.
     if (background) {
         logBackgroundDegradation("before-transport", request, target, "classified background request");
-        return backgroundSuccessResponse();
+        return backgroundResponseFor(request);
     }
 
     try {
         const response = await scramjet.fetch(event);
+
+        // A challenge script keeps its real request, redirects and cookies. Only
+        // a final 404 is converted to valid empty JavaScript to avoid page noise.
+        if (
+            response.status === 404 &&
+            request.destination === "script" &&
+            /\/cdn-cgi\/challenge-platform\//i.test(target?.pathname || "")
+        ) {
+            return emptyJavaScriptResponse();
+        }
 
         // Missing cross-origin favicons are optional display resources. Return
         // an empty image response so a 404 does not become a page-level error.
